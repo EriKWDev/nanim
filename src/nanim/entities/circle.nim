@@ -10,7 +10,7 @@ import entity
 proc newCircle*(radius: float = 100.0): Entity =
   var points: EntityPoints = @[]
 
-  let segments = 8
+  let segments = 9
 
   var angle = 0.0
   while angle < 2 * PI:

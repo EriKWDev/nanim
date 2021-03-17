@@ -167,7 +167,7 @@ proc tick(scene: Scene) =
 
   for tween in scene.tweens:
     tween.evaluate(scene.time)
-    echo tween.target
+    # echo tween.target
   scene.draw()
 
   swapBuffers(scene.window)
@@ -178,7 +178,7 @@ proc tick(scene: Scene) =
 proc update*(scene: Scene) =
   scene.time = cpuTime()
 
-  if scene.time - scene.lastUpdateTime > 1/60:
+  if scene.time - scene.lastUpdateTime > 1/120:
     scene.tick()
 
   pollEvents()
