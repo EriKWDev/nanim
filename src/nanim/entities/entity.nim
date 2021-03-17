@@ -56,6 +56,42 @@ func rotate*(entity: var Entity, dangle: SomeNumber = 0f) =
   entity.transformMatrix = rotateZ(entity.transformMatrix, dangle)
 
 
+proc drawPointsWithTension(context: Context, points: seq[Vec], tension: float = 0.5) =
+  context.moveTo(points[0].x, points[0].y)
+
+  let control_scale = tension / 0.5 * 0.175
+  let num_points = len(points)
+
+  for i in 0..len(points) - 1:
+    let points_before = points[(i - 1 + num_points) mod num_points]
+    let point = points[i]
+    let points_after = points[(i + 1) mod num_points]
+    let points_after2 = points[(i + 2) mod num_points]
+
+    let p4 = points_after
+
+    let di = vec2(points_after.x - points_before.x, points_after.y - points_before.y)
+    let p2 = vec2(point.x + control_scale * di.x, point.y + control_scale * di.y)
+
+    let diPlus1 = vec2(points_after2.x - points[i].x, points_after2.y - points[i].y)
+
+    let p3 = vec2(points_after.x - control_scale * diPlus1.x, points_after.y - control_scale * diPlus1.y)
+
+    context.bezierTo(p2.x, p2.y, p3.x, p3.y, p4.x, p4.y)
+
+
+proc draw*(entity: Entity, context: Context) =
+  context.fillColor(rgb(255, 50, 150))
+  context.strokeColor(rgb(245, 30, 150))
+  context.strokeWidth(20)
+  context.beginPath()
+
+  context.drawPointsWithTension(entity.points)
+
+  context.closePath()
+  context.stroke()
+  context.fill()
+
 
 proc draw*(context: Context, entity: Entity) =
   context.save()
@@ -64,29 +100,6 @@ proc draw*(context: Context, entity: Entity) =
   context.scale(entity.scale.x, entity.scale.y)
   context.rotate(entity.rotation)
 
-  context.fillColor(rgb(255, 50, 150))
-  context.beginPath()
+  entity.draw(context)
 
-  let points = entity.points
-
-  context.moveTo(points[0].x, points[0].y)
-
-  for i in 1..len(points) - 2:
-    let xc = (points[i].x + points[i + 1].x) / 2
-    let yc = (points[i].y + points[i + 1].y) / 2
-    context.quadTo(points[i].x, points[i].y, xc, yc)
-
-  context.quadTo(points[len(points)-2].x,
-                 points[len(points)-2].y,
-                 points[len(points)-1].x,
-                 points[len(points)-1].y)
-
-  context.quadTo(points[len(points)-1].x,
-                 points[len(points)-1].y,
-                 points[0].x,
-                 points[0].y)
-
-  context.closePath()
-  context.stroke()
-  context.fill()
   context.restore()
