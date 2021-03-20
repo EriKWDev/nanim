@@ -1,5 +1,9 @@
 
 import
+  options
+
+
+import
   glm,
   nanovg,
   ../animation/tween,
@@ -18,7 +22,7 @@ type
     points*: EntityPoints
     position*: Position
     rotation*: Rotation
-    scale*: Scale
+    scaling*: Scale
 
 
 proc `$`*(entity: Entity): string =
@@ -28,28 +32,66 @@ proc `$`*(entity: Entity): string =
     "  rotation: " & $(entity.rotation)
 
 
-
 proc init(entity: Entity, points: EntityPoints) =
   entity.points = points
   entity.position = vec3(0.0, 0.0, 0.0)
   entity.rotation = 0.0
-  entity.scale = vec2(1.0, 1.0)
+  entity.scaling = vec2(1.0, 1.0)
+
 
 func newEntity*(points: EntityPoints): Entity =
   new(result)
   result.init(points)
 
 
-func move*(entity: Entity, dx = 0.0, dy = 0.0, dz: float = 0.0): Tween[Entity, Position] =
+func move*(entity: Entity,
+           dx: float = 0.0,
+           dy: float = 0.0,
+           dz: float = 0.0): Tween =
 
-  result = newTween(entity,
-                    entity.position,
-                    entity.position + vec3(dx, dy, dz),
-                    proc(e: Entity, v: Position) =
-                      e.position = v,
-                    linear)
+  var interpolators: seq[proc(t: float)]
+  let delta = vec3(dx, dy, dz)
 
-  entity.position = entity.position + vec3(dx, dy, dz)
+  let
+    startValue = entity.position.deepCopy()
+    endValue = startValue + delta
+
+  let interpolator = proc(t: float) =
+    entity.position = interpolate(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+
+  entity.position = endValue
+
+  result = newTween(interpolators,
+                    defaultEasing,
+                    defaultDuration)
+
+
+func stretch*(entity: Entity,
+              dx: float = 0.0,
+              dy: float = 0.0): Tween =
+
+  var interpolators: seq[proc(t: float)]
+
+  let
+    startValue = entity.scaling.deepCopy()
+    endValue = startValue * vec2(dx, dy)
+
+  let interpolator = proc(t: float) =
+    entity.scaling = interpolate(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+
+  entity.scaling = endValue
+
+  result = newTween(interpolators,
+                    defaultEasing,
+                    defaultDuration)
+
+
+func scale*(entity: Entity, d: float = 0.0): Tween =
+  return entity.stretch(d, d)
 
 
 func rotate*(entity: var Entity, dangle: SomeNumber = 0f) =
@@ -82,7 +124,7 @@ proc drawPointsWithTension(context: Context, points: seq[Vec], tension: float = 
 
 proc draw*(entity: Entity, context: Context) =
   context.fillColor(rgb(255, 50, 150))
-  context.strokeColor(rgb(245, 30, 150))
+  context.strokeColor(rgb(240, 28, 130))
   context.strokeWidth(20)
   context.beginPath()
 
@@ -97,7 +139,7 @@ proc draw*(context: Context, entity: Entity) =
   context.save()
 
   context.translate(entity.position.x, entity.position.y)
-  context.scale(entity.scale.x, entity.scale.y)
+  context.scale(entity.scaling.x, entity.scaling.y)
   context.rotate(entity.rotation)
 
   entity.draw(context)
