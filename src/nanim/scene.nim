@@ -4,12 +4,14 @@ import
   glfw,
   opengl,
   os,
-  times
+  times,
+  algorithm
 
 
 import
   entities/entity,
-  animation/tween
+  animation/tween,
+  animation/easings
 
 
 proc createNVGContext(): Context =
@@ -70,7 +72,7 @@ type
     frameBufferWidth: int32
     frameBufferHeight: int32
 
-    tweens: seq[Tween[Entity, Position]]
+    tweens: seq[Tween]
     entities: seq[Entity]
 
     pixelRatio: float
@@ -83,6 +85,7 @@ proc newScene*(): Scene =
   result.window = createWindow()
   result.time = cpuTime()
   result.lastUpdateTime = -100.0
+  result.tweens = @[]
 
   doAssert glInit()
 
@@ -96,20 +99,37 @@ proc newScene*(): Scene =
   result.context.loadFonts()
 
 
-proc add*(scene: Scene, entity: Entity) =
-  scene.entities.add(entity)
+proc add*(scene: Scene, entities: varargs[Entity]) =
+  scene.entities.add(@entities)
 
 
-proc animate*(scene: Scene, tween: Tween) =
-  scene.tweens.add(tween)
+proc animate*(scene: Scene, tweens: varargs[Tween]) =
+  var previousEndtime: float
+
+  try:
+    let previousTween = scene.tweens[high(scene.tweens)]
+    previousEndTime = previousTween.startTime + previousTween.duration
+  except IndexDefect:
+    previousEndTime = 0.0
 
 
-proc play*(scene: Scene, tween: Tween) =
-    scene.animate(tween)
+  for tween in @tweens:
+    tween.startTime = previousEndTime
+    scene.tweens.add(tween)
 
 
-proc wait*(scene: Scene, duration: SomeNumber) =
-    echo duration
+proc play*(scene: Scene, tweens: varargs[Tween]) =
+    scene.animate(tweens)
+
+
+proc wait*(scene: Scene, duration: float = defaultDuration) =
+  var interpolators: seq[proc(t: float)]
+
+  interpolators.add(proc(t: float) = discard)
+
+  scene.animate(newTween(interpolators,
+                         linear,
+                         duration))
 
 
 proc scaleToUnit(scene: Scene, fraction: float = 1000f) =
@@ -165,9 +185,24 @@ proc tick(scene: Scene) =
   scene.frameBufferWidth = frameBufferWidth
   scene.pixelRatio = 1
 
+
+  var oldTweens: seq[Tween] = @[]
+  var currentTweens: seq[Tween] = @[]
+  var futureTweens: seq[Tween] = @[]
+
+  let currentTime = scene.time * 1000
+
   for tween in scene.tweens:
-    tween.evaluate(scene.time)
-    # echo tween.target
+    if currentTime > tween.startTime + tween.duration: oldTweens.add(tween)
+    elif currentTime < tween.startTime: futureTweens.add(tween)
+    else: currentTweens.add(tween)
+
+  for tween in oldTweens & futureTweens.reversed():
+    tween.evaluate(currentTime)
+
+  for tween in currentTweens:
+    tween.evaluate(currentTime)
+
   scene.draw()
 
   swapBuffers(scene.window)
@@ -185,7 +220,9 @@ proc update*(scene: Scene) =
 
 
 proc setupCallbacks(scene: Scene) =
-  scene.window.framebufferSizeCb = proc(w: Window, s: tuple[w, h: int32]) = scene.update()
+  scene.window.framebufferSizeCb = proc(w: Window, s: tuple[w, h: int32]) =
+    scene.update()
+
   scene.window.windowRefreshCb = proc(w: Window) =
     scene.draw()
     w.swapBuffers()
@@ -195,7 +232,7 @@ proc render*(scene: Scene) =
   scene.setupCallbacks()
 
   while not scene.window.shouldClose:
-      scene.update()
+    scene.update()
 
   nvgDeleteContext(scene.context)
   terminate()

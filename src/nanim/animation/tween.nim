@@ -1,55 +1,35 @@
 
-
-
-import
-  glm,
-  easings
+import easings
 
 
 type
-  Tween*[T,V] = ref object of RootObj
-    target*: T
-    fromValue*: V
-    toValue*: V
+  Tween* = ref object of RootObj
+    startTime*: float
+    duration*: float
 
-    setter*: proc(e: T, v: V)
+    interpolators*: seq[proc(t: float)]
     easing*: Easing
 
 
-func `$`*(tween: Tween): string =
-  result =
-    "Tween\n" &
-    "from: " & $(tween.fromValue) & "\n" &
-    "to: " & $(tween.toValue)
+const defaultDuration*: float = 500.0
 
 
-proc evaluate*[T,V](tween: Tween[T,V], t: float) =
-  tween.setter(tween.target, tween.fromValue + tween.easing(t) * (tween.toValue - tween.fromValue))
+proc evaluate*(tween: Tween, t: float) =
+  var alpha = tween.easing(min(1.0, max(0.0, (t - tween.startTime)/tween.duration)))
+
+  for interpolator in tween.interpolators:
+    interpolator(alpha)
 
 
-func init*[T,V](tween: Tween,
-          target: T,
-          fromValue: V,
-          toValue: V,
-          setter: proc(e: T, v: V),
-          easing: Easing) =
-
-  tween.target = target
-  tween.fromValue = fromValue
-  tween.toValue = toValue
-  tween.setter = setter
+proc init(tween: Tween, interpolators: seq[proc(t: float)], easing: Easing, duration: float) =
+  tween.interpolators = interpolators
   tween.easing = easing
+  tween.duration = duration
 
-func newTween*[T,V](target: T,
-                    fromValue: V,
-                    toValue: V,
-                    setter: proc(e: T, v: V),
-                    easing: Easing): Tween[T,V] =
 
+func newTween*(interpolators: seq[proc(t: float)], easing: proc(t: float): float, duration: float): Tween =
   new(result)
-  result.init(target,
-              fromValue,
-              toValue,
-              setter,
-              easing)
+  result.init(interpolators,
+              easing,
+              duration)
 
