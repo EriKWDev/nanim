@@ -7,7 +7,9 @@ import
   os,
   times,
   algorithm,
-  sequtils
+  sequtils,
+  osproc,
+  streams
 
 
 import
@@ -54,7 +56,7 @@ proc createWindow(resizable: bool = true, width: int = 900, height: int = 500): 
   if window == nil: quit(-1)
 
   # Enables vsync
-  swapInterval(1)
+  swapInterval(0)
 
   return window
 
@@ -69,6 +71,7 @@ type
 
     time: float
     lastUpdateTime: float
+    lastTickTime: float
     deltaTime: float
 
     frameBufferWidth: int32
@@ -149,6 +152,7 @@ proc newScene*(): Scene =
   new(result)
   result.time = cpuTime()
   result.lastUpdateTime = -100.0
+  result.lastTickTime = -100.0
   result.tweens = @[]
   result.projectionMatrix = mat4x4[float](vec4[float](1,0,0,0),
                                           vec4[float](0,1,0,0),
@@ -239,6 +243,7 @@ proc draw*(scene: Scene) =
   glViewport(0, 0, scene.frameBufferWidth, scene.frameBufferHeight)
   context.beginFrame(scene.width.cfloat, scene.height.cfloat, scene.pixelRatio)
 
+  context.save()
   scene.scaleToUnit()
 
   clearWithColor(rgb(255, 255, 255))
@@ -252,6 +257,23 @@ proc draw*(scene: Scene) =
                                          point.project(scene.projectionMatrix))
 
     context.draw(intermediate)
+
+  context.restore()
+
+  #[ let dw = scene.width/len(scene.tweens)
+
+  for i, tween in scene.tweens:
+    if tween in scene.currentTweens:
+       context.fillColor(rgb(60, 160, 60))
+    else:
+       context.fillColor(rgb(100, 100, 100))
+
+    let radius = min(dw, (tween.duration/defaultDuration)*dw)
+
+    context.beginPath()
+    context.roundedRect(i.float * dw.float, scene.height.float - 40, radius, 20, 5, 5, 5, 5)
+    context.closePath()
+    context.fill() ]#
 
   context.endFrame()
 
@@ -293,7 +315,7 @@ proc tick(scene: Scene) =
 
   swapBuffers(scene.window)
 
-  scene.lastUpdateTime = cpuTime() * 1000.0
+  scene.lastTickTime = cpuTime() * 1000
 
   if len(scene.currentTweens) == 0 and len(scene.futureTweens) == 0:
     scene.done = true
@@ -301,10 +323,20 @@ proc tick(scene: Scene) =
 
 proc update*(scene: Scene) =
   let time = cpuTime() * 1000
-  if time - scene.lastUpdateTime >= 1000.0/120.0:
-    scene.time = time
-    scene.deltaTime = time - scene.lastUpdateTime
+
+  # Try to adhere to a max 120 fps
+  # Since vsync is enabled, this should raarely ever
+  let goalDelta = 1000.0/120.0
+  if time - scene.lastTickTime >= goalDelta:
+    scene.time = scene.time + time - scene.lastTickTime
+    scene.deltaTime = time - scene.lastTickTime
     scene.tick()
+
+    if scene.done:
+      scene.time = 0
+      scene.done = false
+
+  scene.lastUpdateTime = time
 
 
 proc setupCallbacks(scene: Scene) =
@@ -340,13 +372,6 @@ proc runLiveRenderingLoop(scene: Scene) =
     pollEvents()
 
 
-proc offset(some: pointer; b: int): pointer {.inline.} =
-  result = cast[pointer](cast[int](some) + b)
-
-
-import osproc, streams
-
-
 proc renderVideo(scene: Scene) =
 
   let
@@ -360,23 +385,25 @@ proc renderVideo(scene: Scene) =
   scene.time = 0.0
   scene.deltaTime = goalDeltaTime
 
-  var ffmpegProcess = startProcess("ffmpeg", "", @[
+  let ffmpegOptions = @[
     "-y",
     "-f", "rawvideo",
     "-s", $width & "x" & $height,
     "-pix_fmt", "rgba",
     "-r", "60",
     "-i", "-",  # Sets input to pipe
-    "-vf", "vflip,format=yuv420p",
+    "-vf", "vflip,format=yuv420p", # Flips the image vertically since glReadPixels is flipped
     "-an",  # Don't expect audio,
-    # "-loglevel", "panic",  # Only log to console if something crashes
+    # "-loglevel", "panic",  # Only log if something crashes
     "-c:v", "libx264",  # H.264 encoding
     "-preset", "ultrafast",  # Should probably stay at fast/medium later
     "-crf", "18",  # Ranges 0-51 indicates lossless compression to worst compression. Sane options are 0-30
     "-tune", "animation",  # Tunes the encoder for animation and 'cartoons'
     "-pix_fmt", "yuv420p",
     "out.mp4"
-  ], options = {poUsePath, poStdErrToStdOut, poEchoCmd})
+  ]
+
+  var ffmpegProcess = startProcess("ffmpeg", "", ffmpegOptions, options = {poUsePath, poStdErrToStdOut, poEchoCmd})
 
   var ffmpegInputStream = ffmpegProcess.inputStream()
 
@@ -389,8 +416,16 @@ proc renderVideo(scene: Scene) =
 
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data)
 
-    ffmpegInputStream.writeData(data, bufferSize)
-    ffmpegInputStream.flush()
+    try:
+      ffmpegInputStream.writeData(data, bufferSize)
+    except:
+      let
+        e = getCurrentException()
+        msg = getCurrentExceptionMsg()
+      echo "Got exception ", repr(e), " with message ", msg
+      scene.done = true
+    finally:
+     ffmpegInputStream.flush()
 
     pollEvents()
 
@@ -398,11 +433,10 @@ proc renderVideo(scene: Scene) =
   discard waitForExit(ffmpegProcess)
 
 
-
 proc render*(userScene: Scene, createVideo: bool = false, width: int = 1920, height: int = 1080) =
   var scene = userScene.deepCopy()
 
-  scene.setupRendering(createVideo, width, height)
+  scene.setupRendering(not createVideo, width, height)
 
   if createVideo:
     scene.renderVideo()

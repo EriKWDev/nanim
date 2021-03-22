@@ -27,7 +27,7 @@ proc testScene(): Scene =
              circle2.scale(2),
              rect.pscale(3))
 
-  scene.animate(rect.setTension(0.6))
+  scene.play(rect.setTension(0.6))
 
   scene.wait(500)
 
@@ -36,6 +36,8 @@ proc testScene(): Scene =
              rect.pscale(1/3))
 
   scene.wait(500)
+  scene.play(rect.setTension(0), rect.move(600))
+  scene.wait(300)
 
   return scene
 
