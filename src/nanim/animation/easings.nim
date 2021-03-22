@@ -4,7 +4,8 @@ import
   # since Matrix arithmetic is defined in glm,
   # we need it here for the interpolate() proc
   glm,
-  math
+  math,
+  sequtils
 
 
 type Easing* = proc(t: float): float
@@ -31,7 +32,22 @@ func expo*(t: float): float =
 const defaultEasing* = outQuad
 
 
+# General interpolation
 proc interpolate*[V](fromValue: V,
                      toValue: V,
                      t: float): V =
   return fromValue + t * (toValue - fromValue)
+
+
+# Interpolatio of sequence of points
+# TODO: Make sequences of differing size interpolate well too
+proc interpolate*(fromValue: seq[Vec3[float]],
+                  toValue: seq[Vec3[float]],
+                  t: float): seq[Vec3[float]] =
+  var newPoints: seq[Vec3[float]]
+
+  let fromTo = zip(fromValue, toValue)
+  for _, points in fromTo:
+    newPoints.add(interpolate(points[0], points[1], t))
+
+  return newPoints

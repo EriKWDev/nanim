@@ -2,14 +2,20 @@
 import
   nanovg,
   glfw,
+  glm,
   opengl,
   os,
   times,
-  algorithm
+  algorithm,
+  sequtils
 
 
 import
   entities/entity,
+  entities/circle,
+  entities/rectangle,
+  entities/text,
+
   animation/tween,
   animation/easings
 
@@ -41,7 +47,7 @@ proc createWindow(): Window =
   var config = DefaultOpenglWindowConfig
   config.size = (w: 900, h: 500)
   config.title = "Testing NanoVG"
-  config.resizable = true
+  config.resizable = false
   config.nMultiSamples = 8
   config.debugContext = true
   config.bits = (r: 8, g: 8, b: 8, a: 8, stencil: 8, depth: 16)
@@ -68,14 +74,78 @@ type
 
     time: float
     lastUpdateTime: float
+    deltaTime: float
 
     frameBufferWidth: int32
     frameBufferHeight: int32
 
     tweens: seq[Tween]
+
+    currentTweens: seq[Tween]
+    oldTweens: seq[Tween]
+    futureTweens: seq[Tween]
+
     entities: seq[Entity]
+    projectionMatrix*: Mat4x4[float]
 
     pixelRatio: float
+
+
+proc scale*(scene: Scene, d: float = 0): Tween =
+  var interpolators: seq[proc(t: float)]
+
+  let
+    startValue = scene.projectionMatrix.deepCopy()
+    endValue = startValue.scale(vec3(d,d,d))
+
+  let interpolator = proc(t: float) =
+    scene.projectionMatrix = interpolate(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+
+  scene.projectionMatrix = endValue
+
+  result = newTween(interpolators,
+                    defaultEasing,
+                    defaultDuration)
+
+
+proc rotate*(scene: Scene, angle: float = 0): Tween =
+  var interpolators: seq[proc(t: float)]
+
+  let
+    startValue = scene.projectionMatrix.deepCopy()
+    endValue = startValue.rotateZ(angle)
+
+  let interpolator = proc(t: float) =
+    scene.projectionMatrix = interpolate(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+
+  scene.projectionMatrix = endValue
+
+  result = newTween(interpolators,
+                    defaultEasing,
+                    defaultDuration)
+
+
+proc move*(scene: Scene, dx: float = 0, dy: float = 0, dz: float = 0): Tween =
+  var interpolators: seq[proc(t: float)]
+
+  let
+    startValue = scene.projectionMatrix.deepCopy()
+    endValue = startValue.translate(vec3(dx, dy, dz))
+
+  let interpolator = proc(t: float) =
+    scene.projectionMatrix = interpolate(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+
+  scene.projectionMatrix = endValue
+
+  result = newTween(interpolators,
+                    defaultEasing,
+                    defaultDuration)
 
 
 proc newScene*(): Scene =
@@ -86,6 +156,10 @@ proc newScene*(): Scene =
   result.time = cpuTime()
   result.lastUpdateTime = -100.0
   result.tweens = @[]
+  result.projectionMatrix = mat4x4[float](vec4[float](1,0,0,0),
+                                          vec4[float](0,1,0,0),
+                                          vec4[float](0,0,1,0),
+                                          vec4[float](0,0,0,1))
 
   doAssert glInit()
 
@@ -155,6 +229,24 @@ proc clearWithColor(color: Color = black(1f)) =
           GL_STENCIL_BUFFER_BIT)
 
 
+func project(point: Vec3[float], projection: Mat4x4[float]): Vec3[float] =
+  let v4 = vec4(point.x, point.y, point.z, 1.0)
+  let res = projection * v4
+  result = vec3(res.x, res.y, res.z)
+
+
+proc draw*(context: Context, entity: Entity) =
+  context.save()
+
+  context.translate(entity.position.x, entity.position.y)
+  context.scale(entity.scaling.x, entity.scaling.y)
+  context.rotate(entity.rotation)
+
+  entity.draw(context)
+
+  context.restore()
+
+
 proc draw*(scene: Scene) =
   let context = scene.context
 
@@ -168,12 +260,22 @@ proc draw*(scene: Scene) =
   clearWithColor(rgb(255, 255, 255))
 
   for entity in scene.entities:
-    context.draw(entity)
+    var intermediate = entity.deepCopy()
+
+    # Apply the scene's projection matrix to every point of every entity
+    intermediate.points = sequtils.map(intermediate.points,
+                                       proc(point: Vec3[float]): Vec3[float] =
+                                         point.project(scene.projectionMatrix))
+
+    context.draw(intermediate)
 
   context.endFrame()
 
 
 proc tick(scene: Scene) =
+  scene.time = cpuTime() * 1000
+  scene.deltaTime = scene.time - scene.lastUpdateTime
+
   var (windowWidth, windowHeight) = scene.window.size
 
   scene.width = windowWidth
@@ -185,23 +287,22 @@ proc tick(scene: Scene) =
   scene.frameBufferWidth = frameBufferWidth
   scene.pixelRatio = 1
 
-
-  var oldTweens: seq[Tween] = @[]
-  var currentTweens: seq[Tween] = @[]
-  var futureTweens: seq[Tween] = @[]
-
-  let currentTime = scene.time * 1000
-
+  # By first evaluating all future tweens in reverse order, then old tweens and
+  # finally the current ones, we assure that all tween's have been reset and/or
+  # completed correctly.
   for tween in scene.tweens:
-    if currentTime > tween.startTime + tween.duration: oldTweens.add(tween)
-    elif currentTime < tween.startTime: futureTweens.add(tween)
-    else: currentTweens.add(tween)
+    if scene.time  > tween.startTime + tween.duration:
+      scene.oldTweens.add(tween)
+    elif scene.time  < tween.startTime:
+      scene.futureTweens.add(tween)
+    else:
+      scene.currentTweens.add(tween)
 
-  for tween in oldTweens & futureTweens.reversed():
-    tween.evaluate(currentTime)
+    for tween in scene.oldTweens & scene.futureTweens.reversed():
+      tween.evaluate(scene.time )
 
-  for tween in currentTweens:
-    tween.evaluate(currentTime)
+  for tween in scene.currentTweens:
+    tween.evaluate(scene.time )
 
   scene.draw()
 
@@ -211,12 +312,8 @@ proc tick(scene: Scene) =
 
 
 proc update*(scene: Scene) =
-  scene.time = cpuTime()
-
-  if scene.time - scene.lastUpdateTime > 1/120:
+  if cpuTime() * 1000 - scene.lastUpdateTime > 1/120:
     scene.tick()
-
-  pollEvents()
 
 
 proc setupCallbacks(scene: Scene) =
@@ -228,11 +325,15 @@ proc setupCallbacks(scene: Scene) =
     w.swapBuffers()
 
 
-proc render*(scene: Scene) =
+proc render*(scene: Scene, width: int = 1920, height: int = 1080) =
   scene.setupCallbacks()
 
+
+  # TODO: Make scene.update loop be on a separate thread
+  # That would allow rendering even while user is dragging window...
   while not scene.window.shouldClose:
     scene.update()
+    pollEvents()
 
   nvgDeleteContext(scene.context)
   terminate()

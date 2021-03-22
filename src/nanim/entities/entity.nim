@@ -1,6 +1,5 @@
 
-import
-  options
+import sequtils, math
 
 
 import
@@ -11,17 +10,17 @@ import
 
 
 type
-  EntityPoints* = seq[Vec3[float]]
   Position* = Vec3[float]
-  Rotation* = float
-  Scale* = Vec2[float]
+  Scale* = Vec3[float]
 
   Context* = NVGContext
 
   Entity* = ref object of RootObj
-    points*: EntityPoints
+    points*: seq[Vec3[float]]
+    tension*: float
+
     position*: Position
-    rotation*: Rotation
+    rotation*: float
     scaling*: Scale
 
 
@@ -32,16 +31,58 @@ proc `$`*(entity: Entity): string =
     "  rotation: " & $(entity.rotation)
 
 
-proc init(entity: Entity, points: EntityPoints) =
-  entity.points = points
+proc drawPointsWithTension(context: Context, points: seq[Vec], tension: float = 0.5) =
+  if len(points) < 2: return
+
+  context.moveTo(points[0].x, points[0].y)
+
+  let controlScale = tension / 0.5 * 0.175
+  let numberOfPoints = len(points)
+
+  for i in 0..len(points) - 1:
+    let points_before = points[(i - 1 + numberOfPoints) mod numberOfPoints]
+    let point = points[i]
+
+    let pointAfter = points[(i + 1) mod numberOfPoints]
+    let pointAfter2 = points[(i + 2) mod numberOfPoints]
+
+    let p4 = pointAfter
+
+    let di = vec2(pointAfter.x - points_before.x, pointAfter.y - points_before.y)
+    let p2 = vec2(point.x + controlScale * di.x, point.y + controlScale * di.y)
+
+    let diPlus1 = vec2(pointAfter2.x - points[i].x, pointAfter2.y - points[i].y)
+
+    let p3 = vec2(pointAfter.x - controlScale * diPlus1.x, pointAfter.y - controlScale * diPlus1.y)
+
+    context.bezierTo(p2.x, p2.y, p3.x, p3.y, p4.x, p4.y)
+
+
+method draw*(entity: Entity, context: Context) {.base.} =
+  context.fillColor(rgb(255, 56, 116))
+  context.strokeColor(rgb(230, 26, 94))
+  context.strokeWidth(20)
+  context.beginPath()
+
+  context.drawPointsWithTension(entity.points, entity.tension)
+
+  context.closePath()
+  context.stroke()
+  context.fill()
+
+
+func init*(entity: Entity) =
+  entity.points = @[]
+  entity.tension = 0.5
   entity.position = vec3(0.0, 0.0, 0.0)
   entity.rotation = 0.0
-  entity.scaling = vec2(1.0, 1.0)
+  entity.scaling = vec3(1.0, 1.0, 1.0)
 
 
-func newEntity*(points: EntityPoints): Entity =
+func newEntity*(points: seq[Vec3[float]]): Entity =
   new(result)
-  result.init(points)
+  result.init()
+  result.points = points
 
 
 func move*(entity: Entity,
@@ -70,13 +111,14 @@ func move*(entity: Entity,
 
 func stretch*(entity: Entity,
               dx: float = 0.0,
-              dy: float = 0.0): Tween =
+              dy: float = 0.0,
+              dz: float = 0.0): Tween =
 
   var interpolators: seq[proc(t: float)]
 
   let
     startValue = entity.scaling.deepCopy()
-    endValue = startValue * vec2(dx, dy)
+    endValue = startValue * vec3(dx, dy, dz)
 
   let interpolator = proc(t: float) =
     entity.scaling = interpolate(startValue, endValue, t)
@@ -91,57 +133,72 @@ func stretch*(entity: Entity,
 
 
 func scale*(entity: Entity, d: float = 0.0): Tween =
-  return entity.stretch(d, d)
+  return entity.stretch(d, d, d)
 
 
-func rotate*(entity: var Entity, dangle: SomeNumber = 0f) =
-  entity.transformMatrix = rotateZ(entity.transformMatrix, dangle)
+proc pscale*(entity: Entity, d: float = 0.0): Tween =
+
+  var interpolators: seq[proc(t: float)]
+
+  let
+    startValue = entity.points.deepCopy()
+    endValue = entity.points.map(proc(point: Vec3[float]): Vec3[float] = point * d)
+
+  let interpolator = proc(t: float) =
+    entity.points = interpolate(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+
+  entity.points = endValue
+
+  result = newTween(interpolators,
+                    defaultEasing,
+                    defaultDuration)
 
 
-proc drawPointsWithTension(context: Context, points: seq[Vec], tension: float = 0.5) =
-  context.moveTo(points[0].x, points[0].y)
-
-  let control_scale = tension / 0.5 * 0.175
-  let num_points = len(points)
-
-  for i in 0..len(points) - 1:
-    let points_before = points[(i - 1 + num_points) mod num_points]
-    let point = points[i]
-    let points_after = points[(i + 1) mod num_points]
-    let points_after2 = points[(i + 2) mod num_points]
-
-    let p4 = points_after
-
-    let di = vec2(points_after.x - points_before.x, points_after.y - points_before.y)
-    let p2 = vec2(point.x + control_scale * di.x, point.y + control_scale * di.y)
-
-    let diPlus1 = vec2(points_after2.x - points[i].x, points_after2.y - points[i].y)
-
-    let p3 = vec2(points_after.x - control_scale * diPlus1.x, points_after.y - control_scale * diPlus1.y)
-
-    context.bezierTo(p2.x, p2.y, p3.x, p3.y, p4.x, p4.y)
+type
+  AngleMode* = enum
+    amDegrees, amRadians
 
 
-proc draw*(entity: Entity, context: Context) =
-  context.fillColor(rgb(255, 50, 150))
-  context.strokeColor(rgb(240, 28, 130))
-  context.strokeWidth(20)
-  context.beginPath()
+func rotate*(entity: Entity, dangle: float = 0.0, mode: AngleMode = amDegrees): Tween =
+  var interpolators: seq[proc(t: float)]
+  var angle: float
 
-  context.drawPointsWithTension(entity.points)
+  case mode:
+  of amDegrees: angle = math.degToRad(dangle)
+  of amRadians: angle = dangle
 
-  context.closePath()
-  context.stroke()
-  context.fill()
+  let
+    startValue = entity.rotation.deepCopy()
+    endValue = startValue + angle
+
+  let interpolator = proc(t: float) =
+    entity.rotation = interpolate(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+
+  entity.rotation = endValue
+
+  result = newTween(interpolators,
+                    defaultEasing,
+                    defaultDuration)
 
 
-proc draw*(context: Context, entity: Entity) =
-  context.save()
+func setTension*(entity: Entity, tension: float = 0.0): Tween =
+  var interpolators: seq[proc(t: float)]
 
-  context.translate(entity.position.x, entity.position.y)
-  context.scale(entity.scaling.x, entity.scaling.y)
-  context.rotate(entity.rotation)
+  let
+    startValue = entity.tension.deepCopy()
+    endValue = startValue + tension
 
-  entity.draw(context)
+  let interpolator = proc(t: float) =
+    entity.tension = interpolate(startValue, endValue, t)
 
-  context.restore()
+  interpolators.add(interpolator)
+
+  entity.tension = endValue
+
+  result = newTween(interpolators,
+                    defaultEasing,
+                    defaultDuration)
