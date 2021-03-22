@@ -18,7 +18,7 @@ func inQuad*(t: float): float = return pow(t, 4.0)
 func outQuad*(t: float): float = return 1.0 - inQuad(t - 1.0)
 
 func inOutQuad*(t: float): float =
-  return if t < 0.5: inQuad(8.0*t) else: outQuad(8.0*t)
+  return if t < 0.5: inQuad(4.0*t) else: outQuad(4.0*t)
 
 
 func sigmoid*(t: float): float =
@@ -39,7 +39,7 @@ proc interpolate*[V](fromValue: V,
   return fromValue + t * (toValue - fromValue)
 
 
-# Interpolatio of sequence of points
+# Interpolation of sequence of points
 # TODO: Make sequences of differing size interpolate well too
 proc interpolate*(fromValue: seq[Vec3[float]],
                   toValue: seq[Vec3[float]],

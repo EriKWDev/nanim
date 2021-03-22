@@ -185,12 +185,12 @@ func rotate*(entity: Entity, dangle: float = 0.0, mode: AngleMode = amDegrees): 
                     defaultDuration)
 
 
-func setTension*(entity: Entity, tension: float = 0.0): Tween =
+proc setTension*(entity: Entity, tension: float = 0.0): Tween =
   var interpolators: seq[proc(t: float)]
 
   let
     startValue = entity.tension.deepCopy()
-    endValue = startValue + tension
+    endValue = tension
 
   let interpolator = proc(t: float) =
     entity.tension = interpolate(startValue, endValue, t)
