@@ -12,9 +12,6 @@ import
 
 import
   entities/entity,
-  entities/circle,
-  entities/rectangle,
-  entities/text,
 
   animation/tween,
   animation/easings
@@ -43,11 +40,11 @@ proc loadFonts(context: Context) =
   doAssert not (fontBold == NoFont)
 
 
-proc createWindow(): Window =
+proc createWindow(resizable: bool = true, width: int = 900, height: int = 500): Window =
   var config = DefaultOpenglWindowConfig
-  config.size = (w: 900, h: 500)
-  config.title = "Testing NanoVG"
-  config.resizable = false
+  config.size = (w: width, h: height)
+  config.title = "Nanim"
+  config.resizable = resizable
   config.nMultiSamples = 8
   config.debugContext = true
   config.bits = (r: 8, g: 8, b: 8, a: 8, stencil: 8, depth: 16)
@@ -56,10 +53,8 @@ proc createWindow(): Window =
   let window = newWindow(config)
   if window == nil: quit(-1)
 
-  when defined(vsync):
-    swapInterval(1)
-  else:
-    swapInterval(0)
+  # Enables vsync
+  swapInterval(1)
 
   return window
 
@@ -89,6 +84,8 @@ type
     projectionMatrix*: Mat4x4[float]
 
     pixelRatio: float
+
+    done: bool
 
 
 proc scale*(scene: Scene, d: float = 0): Tween =
@@ -149,10 +146,7 @@ proc move*(scene: Scene, dx: float = 0, dy: float = 0, dz: float = 0): Tween =
 
 
 proc newScene*(): Scene =
-  initialize()
-
   new(result)
-  result.window = createWindow()
   result.time = cpuTime()
   result.lastUpdateTime = -100.0
   result.tweens = @[]
@@ -160,17 +154,7 @@ proc newScene*(): Scene =
                                           vec4[float](0,1,0,0),
                                           vec4[float](0,0,1,0),
                                           vec4[float](0,0,0,1))
-
-  doAssert glInit()
-
-  glEnable(GL_MULTISAMPLE)
-
-  makeContextCurrent(result.window)
-
-  nvgInit(getProcAddress)
-  result.context = createNVGContext()
-
-  result.context.loadFonts()
+  result.done = false
 
 
 proc add*(scene: Scene, entities: varargs[Entity]) =
@@ -222,7 +206,7 @@ proc scaleToUnit(scene: Scene, fraction: float = 1000f) =
   scene.context.scale(unit, unit)
 
 
-proc clearWithColor(color: Color = black(1f)) =
+proc clearWithColor(color: Color = rgb(0, 0, 0)) =
   glClearColor(color.r, color.g, color.b, color.a)
   glClear(GL_COLOR_BUFFER_BIT or
           GL_DEPTH_BUFFER_BIT or
@@ -273,9 +257,6 @@ proc draw*(scene: Scene) =
 
 
 proc tick(scene: Scene) =
-  scene.time = cpuTime() * 1000
-  scene.deltaTime = scene.time - scene.lastUpdateTime
-
   var (windowWidth, windowHeight) = scene.window.size
 
   scene.width = windowWidth
@@ -290,6 +271,10 @@ proc tick(scene: Scene) =
   # By first evaluating all future tweens in reverse order, then old tweens and
   # finally the current ones, we assure that all tween's have been reset and/or
   # completed correctly.
+  scene.oldTweens = @[]
+  scene.futureTweens = @[]
+  scene.currentTweens = @[]
+
   for tween in scene.tweens:
     if scene.time  > tween.startTime + tween.duration:
       scene.oldTweens.add(tween)
@@ -299,41 +284,130 @@ proc tick(scene: Scene) =
       scene.currentTweens.add(tween)
 
     for tween in scene.oldTweens & scene.futureTweens.reversed():
-      tween.evaluate(scene.time )
+      tween.evaluate(scene.time)
 
   for tween in scene.currentTweens:
-    tween.evaluate(scene.time )
+    tween.evaluate(scene.time)
 
   scene.draw()
 
   swapBuffers(scene.window)
 
-  scene.lastUpdateTime = cpuTime()
+  scene.lastUpdateTime = cpuTime() * 1000.0
+
+  if len(scene.currentTweens) == 0 and len(scene.futureTweens) == 0:
+    scene.done = true
 
 
 proc update*(scene: Scene) =
-  if cpuTime() * 1000 - scene.lastUpdateTime > 1/120:
+  let time = cpuTime() * 1000
+  if time - scene.lastUpdateTime >= 1000.0/120.0:
+    scene.time = time
+    scene.deltaTime = time - scene.lastUpdateTime
     scene.tick()
 
 
 proc setupCallbacks(scene: Scene) =
   scene.window.framebufferSizeCb = proc(w: Window, s: tuple[w, h: int32]) =
-    scene.update()
+    scene.tick()
 
   scene.window.windowRefreshCb = proc(w: Window) =
-    scene.draw()
+    scene.tick()
     w.swapBuffers()
 
 
-proc render*(scene: Scene, width: int = 1920, height: int = 1080) =
-  scene.setupCallbacks()
+proc setupRendering(scene: var Scene, resizable: bool = true, width: int = 1920, height: int = 1080) =
+  initialize()
+  scene.window = createWindow(resizable, width, height)
+  if resizable: scene.setupCallbacks()
+
+  doAssert glInit()
+
+  glEnable(GL_MULTISAMPLE)
+
+  makeContextCurrent(scene.window)
+
+  nvgInit(getProcAddress)
+  scene.context = createNVGContext()
+
+  scene.context.loadFonts()
 
 
-  # TODO: Make scene.update loop be on a separate thread
-  # That would allow rendering even while user is dragging window...
+proc runLiveRenderingLoop(scene: Scene) =
+  # TODO: Make scene.update loop be on a separate thread. That would allow rendering even while user is dragging window...
   while not scene.window.shouldClose:
     scene.update()
     pollEvents()
+
+
+proc offset(some: pointer; b: int): pointer {.inline.} =
+  result = cast[pointer](cast[int](some) + b)
+
+
+import osproc, streams
+
+
+proc renderVideo(scene: Scene) =
+
+  let
+    width = 1920.cint
+    height = 1080.cint
+    rgbaSize = 4
+    bufferSize = width * height * rgbaSize
+    goalFps = 60.0
+    goalDeltaTime = 1000.0/goalFps
+
+  scene.time = 0.0
+  scene.deltaTime = goalDeltaTime
+
+  var ffmpegProcess = startProcess("ffmpeg", "", @[
+    "-y",
+    "-f", "rawvideo",
+    "-s", $width & "x" & $height,
+    "-pix_fmt", "rgba",
+    "-r", "60",
+    "-i", "-",  # Sets input to pipe
+    "-vf", "vflip,format=yuv420p",
+    "-an",  # Don't expect audio,
+    # "-loglevel", "panic",  # Only log to console if something crashes
+    "-c:v", "libx264",  # H.264 encoding
+    "-preset", "ultrafast",  # Should probably stay at fast/medium later
+    "-crf", "18",  # Ranges 0-51 indicates lossless compression to worst compression. Sane options are 0-30
+    "-tune", "animation",  # Tunes the encoder for animation and 'cartoons'
+    "-pix_fmt", "yuv420p",
+    "out.mp4"
+  ], options = {poUsePath, poStdErrToStdOut, poEchoCmd})
+
+  var ffmpegInputStream = ffmpegProcess.inputStream()
+
+  while not scene.window.shouldClose and not scene.done:
+    scene.tick()
+    scene.time = scene.time + goalDeltaTime
+
+    var data = alloc(bufferSize)
+    defer: dealloc(data)
+
+    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data)
+
+    ffmpegInputStream.writeData(data, bufferSize)
+    ffmpegInputStream.flush()
+
+    pollEvents()
+
+  close(ffmpegProcess)
+  discard waitForExit(ffmpegProcess)
+
+
+
+proc render*(userScene: Scene, createVideo: bool = false, width: int = 1920, height: int = 1080) =
+  var scene = userScene.deepCopy()
+
+  scene.setupRendering(createVideo, width, height)
+
+  if createVideo:
+    scene.renderVideo()
+  else:
+    scene.runLiveRenderingLoop()
 
   nvgDeleteContext(scene.context)
   terminate()
