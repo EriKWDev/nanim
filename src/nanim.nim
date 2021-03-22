@@ -15,8 +15,14 @@ import
   # Entities
   nanim/entities/entity,
   nanim/entities/circle,
+  nanim/entities/rectangle,
+  nanim/entities/text,
 
   # Scene
   nanim/scene
 
-export tween, easings, scene, entity, circle
+export tween, easings, scene, entity, circle, rectangle, text
+
+# exporting these doesn't make sense in a normal library, but I can't bother importing them in every scene
+import lenientops, glm
+export lenientops, glm

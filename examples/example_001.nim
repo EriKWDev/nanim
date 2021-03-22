@@ -1,22 +1,35 @@
 
-import lenientops, nanim
+import nanim
 
 
 proc testScene(): Scene =
     let scene = newScene()
 
-    var circles: seq[Entity]
+    var circle1 = newCircle(60)
+    var circle2 = newCircle(60)
 
-    for i in 0..10:
-        circles.add(newCircle(50))
+    var text = newText("Hello, World!")
 
-    scene.add(circles)
+    var rect = newSquare()
 
-    scene.wait()
+    scene.add(circle1, circle2, text, rect)
 
-    for i, circle in circles:
-        scene.play(circle.move(150.0 + i * 10.0, 220.0))
-        scene.wait(50)
+    scene.wait(1000)
+    scene.play(circle1.move(200, 200),
+               circle2.move(500, 200),
+               text.move(500, 500),
+               rect.move(100, 500),
+               rect.rotate(45))
+
+    scene.wait(1000)
+    scene.play(circle1.pscale(2),
+               circle2.scale(2),
+               rect.pscale(3))
+
+    scene.wait(1000)
+    scene.play(rect.setTension(0.6))
+
+    scene.wait(1000)
 
     return scene
 
