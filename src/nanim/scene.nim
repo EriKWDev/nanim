@@ -9,6 +9,7 @@ import
   algorithm,
   sequtils,
   osproc,
+  math,
   streams
 
 
@@ -194,6 +195,15 @@ proc wait*(scene: Scene, duration: float = defaultDuration) =
                          duration))
 
 
+proc showAllEntities*(scene: Scene) =
+  var tweens: seq[Tween]
+
+  for entity in scene.entities:
+    tweens.add(entity.show())
+
+  scene.play(tweens)
+
+
 proc scaleToUnit(scene: Scene, fraction: float = 1000f) =
   let n = min(scene.width, scene.height).float
   let d = max(scene.width, scene.height).float
@@ -294,8 +304,8 @@ proc tick(scene: Scene) =
   # finally the current ones, we assure that all tween's have been reset and/or
   # completed correctly.
   scene.oldTweens = @[]
-  scene.futureTweens = @[]
   scene.currentTweens = @[]
+  scene.futureTweens = @[]
 
   for tween in scene.tweens:
     if scene.time  > tween.startTime + tween.duration:
@@ -305,8 +315,13 @@ proc tick(scene: Scene) =
     else:
       scene.currentTweens.add(tween)
 
-    for tween in scene.oldTweens & scene.futureTweens.reversed():
-      tween.evaluate(scene.time)
+
+  when not defined(release):
+    let progress = (len(scene.oldTweens) + len(scene.currentTweens)) / len(scene.tweens)
+    stdout.write "\r" & $len(scene.oldTweens) & ":" & $len(scene.currentTweens) & ":" & $len(scene.futureTweens) & " --- " & $(round(progress * 100)) & "%"
+
+  for tween in scene.oldTweens & scene.futureTweens.reversed():
+    tween.evaluate(scene.time)
 
   for tween in scene.currentTweens:
     tween.evaluate(scene.time)
@@ -372,63 +387,71 @@ proc runLiveRenderingLoop(scene: Scene) =
     pollEvents()
 
 
-proc renderVideo(scene: Scene) =
+import winlean
 
+
+proc renderVideo(scene: Scene) =
   let
     width = 1920.cint
     height = 1080.cint
-    rgbaSize = 4
-    bufferSize = width * height * rgbaSize
+    rgbaSize = sizeof(cint)
+    bufferSize: int = width * height * rgbaSize
     goalFps = 60.0
     goalDeltaTime = 1000.0/goalFps
 
   scene.time = 0.0
   scene.deltaTime = goalDeltaTime
 
+  let rendersFolderPath = os.joinPath(os.getAppDir(), "renders")
+
+  createDir(rendersFolderPath)
+
+  let outputVideoPath = os.joinPath(rendersFolderPath, "scene.mp4")
+
   let ffmpegOptions = @[
     "-y",
     "-f", "rawvideo",
-    "-s", $width & "x" & $height,
     "-pix_fmt", "rgba",
-    "-r", "60",
+    "-s", $width & "x" & $height,
+    "-r", $goalFps.int,
     "-i", "-",  # Sets input to pipe
-    "-vf", "vflip,format=yuv420p", # Flips the image vertically since glReadPixels is flipped
+
+
+    "-vf", "vflip", # Flips the image vertically since glReadPixels is flipped
     "-an",  # Don't expect audio,
     # "-loglevel", "panic",  # Only log if something crashes
     "-c:v", "libx264",  # H.264 encoding
-    "-preset", "ultrafast",  # Should probably stay at fast/medium later
+    "-preset", "slow",  # Should probably stay at fast/medium later
     "-crf", "18",  # Ranges 0-51 indicates lossless compression to worst compression. Sane options are 0-30
     "-tune", "animation",  # Tunes the encoder for animation and 'cartoons'
-    "-pix_fmt", "yuv420p",
-    "out.mp4"
+    "-pix_fmt", "yuv444p",
+    outputVideoPath
   ]
 
-  var ffmpegProcess = startProcess("ffmpeg", "", ffmpegOptions, options = {poUsePath, poStdErrToStdOut, poEchoCmd})
+  let ffmpegProcess = startProcess("ffmpeg", "", ffmpegOptions, options = {poUsePath, poEchoCmd})
+  var data = alloc(bufferSize)
 
-  var ffmpegInputStream = ffmpegProcess.inputStream()
+  while not scene.window.shouldClose:
+    pollEvents()
 
-  while not scene.window.shouldClose and not scene.done:
     scene.tick()
     scene.time = scene.time + goalDeltaTime
 
-    var data = alloc(bufferSize)
-    defer: dealloc(data)
-
+    glPixelStorei(GL_PACK_ALIGNMENT, 1)
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data)
 
     try:
-      ffmpegInputStream.writeData(data, bufferSize)
+      ffmpegProcess.inputStream().writeData(data, bufferSize)
     except:
       let
-        e = getCurrentException()
         msg = getCurrentExceptionMsg()
-      echo "Got exception ", repr(e), " with message ", msg
+      echo msg
       scene.done = true
-    finally:
-     ffmpegInputStream.flush()
 
-    pollEvents()
+    if scene.done:
+      scene.window.shouldClose = true
 
+  dealloc(data)
   close(ffmpegProcess)
   discard waitForExit(ffmpegProcess)
 
@@ -445,3 +468,7 @@ proc render*(userScene: Scene, createVideo: bool = false, width: int = 1920, hei
 
   nvgDeleteContext(scene.context)
   terminate()
+
+
+proc render*(userSceneCreator: proc(): Scene, createVideo: bool = false, width: int = 1920, height: int = 1080) =
+  render(userSceneCreator(), createVideo, width, height)

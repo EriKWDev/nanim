@@ -1,25 +1,56 @@
 
+import
+  os,
+  osproc,
+  streams
 
-proc printNames(names: varargs[string],
-                id1: int = 0,
-                id2: int = 20) =
-    echo id1, "-", id2, ": ", $names
 
-# Works
-printNames("Foo", "Bar", id2=10, id1=10)
-printNames("Foo", "Bar", id1=10, id2=10)
-printNames("Foo", "Bar", 10, 10)
+let rendersFolderPath = os.joinPath(os.getAppDir(), "renders")
 
-## Doesn't compile
-#[ All These Produce:
-first type mismatch at position: 2
-  required type for id1: int
-  but expression '"Bar"' is of type: string
-]#
+createDir(rendersFolderPath)
 
-printNames("Foo", "Bar", 10)
-printNames("Foo", "Bar", id1=10)
-printNames("Foo", "Bar", id2=10)
+let outputVideoPath = os.joinPath(rendersFolderPath, "scene.mp4")
+
+
+let
+  width = 1920.cint
+  height = 1080.cint
+  rgbaSize = sizeof(cint)
+  bufferSize: int = width * height * rgbaSize
+  goalFps = 60.0
 
 
 
+let ffmpegOptions = @[
+  "-y",
+  "-f", "rawvideo",
+  "-pix_fmt", "rgba",
+  "-s", $width & "x" & $height,
+  "-r", $goalFps.int,
+  "-i", "-",  # Sets input to pipe
+
+  "-an",  # Don't expect audio,
+  # "-loglevel", "panic",  # Only log if something crashes
+  "-c:v", "libx264",  # H.264 encoding
+  "-preset", "slow",  # Should probably stay at fast/medium later
+  "-crf", "18",  # Ranges 0-51 indicates lossless compression to worst compression. Sane options are 0-30
+  "-tune", "animation",  # Tunes the encoder for animation and 'cartoons'
+  "-pix_fmt", "yuv444p",
+  outputVideoPath
+]
+
+let ffmpegProcess = startProcess("ffmpeg", "", ffmpegOptions, options = {poUsePath, poEchoCmd})
+var data = alloc(bufferSize)
+
+for i in 0..100000:
+  try:
+    ffmpegProcess.inputStream().writeData(data, bufferSize)
+  except:
+    let
+      e = getCurrentException()
+      msg = getCurrentExceptionMsg()
+    echo "Got exception ", repr(e), " with message ", msg
+
+ffmpegProcess.inputStream().flush()
+dealloc(data)
+close(ffmpegProcess)
