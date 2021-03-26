@@ -1,5 +1,5 @@
 
-import nanovg
+import cairo
 
 
 import entity
@@ -10,8 +10,7 @@ type
     message*: string
     font*: string
     fontSize*: float
-    horizontalAlignment*: HorizontalAlign
-    verticalAlignment*: VerticalAlign
+    fontOptions*: FontOptions
 
 
 
@@ -20,26 +19,26 @@ proc init*(text: Text) =
   text.message = ""
 
 
-proc newText*(message: string = "", fontSize: float = 12, font: string = "montserrat", horizontalAlignment: HorizontalAlign = haCenter, verticalAlignment: VerticalAlign = vaBaseline): Text =
+proc newText*(message: string = "",
+              fontSize: float = 12,
+              font: string = "montserrat"): Text =
+
   new(result)
   result.init()
   result.message = message
   result.fontSize = fontSize
   result.font = font
-  result.horizontalAlignment = horizontalAlignment
-  result.verticalAlignment = verticalAlignment
 
 
-method draw*(text: Text, context: NVGContext) =
-  context.fillColor(rgb(255, 56, 116))
-  context.strokeColor(rgb(230, 26, 94))
-  context.strokeWidth(20)
+method draw*(text: Text, context: ptr Context) =
+  context.selectFontFace(text.font, FontSlantNormal, FontWeightNormal)
 
-  context.textAlign(text.horizontalAlignment, text.verticalAlignment)
-  context.fontSize(text.fontSize * 10)
-  context.fontFace(text.font)
+  context.newPath()
+  context.textPath(text.message)
+  context.closePath()
 
-  discard context.text(0, 0, text.message)
-
+  context.setLineWidth(20)
+  context.setColor(rgb(230, 26, 94))
   context.stroke()
+  context.setColor(rgb(255, 56, 116))
   context.fill()

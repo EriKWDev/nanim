@@ -1,6 +1,5 @@
 
 import
-  nanovg,
   glfw,
   glm,
   opengl,
@@ -10,6 +9,7 @@ import
   sequtils,
   osproc,
   math,
+  cairo,
   streams
 
 
@@ -20,17 +20,13 @@ import
   animation/easings
 
 
-proc createNVGContext(): Context =
-  let flags = {nifStencilStrokes, nifDebug}
-  return nvgCreateContext(flags)
-
-
-proc loadFonts(context: Context) =
+proc loadFonts(context: ptr Context) =
   let fontFolderPath = os.joinPath(os.getAppDir(), "fonts")
 
   echo "Loading fonts from: " & fontFolderPath
+  echo "Could not load fonts (Not impllemented yet)."
 
-  let fontNormal = context.createFont("montserrat", os.joinPath(fontFolderPath, "Montserrat-Regular.ttf"))
+  #[ let fontNormal = context.createFont("montserrat", os.joinPath(fontFolderPath, "Montserrat-Regular.ttf"))
   doAssert not (fontNormal == NoFont)
 
   let fontThin = context.createFont("montserrat-thin", os.joinPath(fontFolderPath, "Montserrat-Thin.ttf"))
@@ -40,7 +36,7 @@ proc loadFonts(context: Context) =
   doAssert not (fontLight == NoFont)
 
   let fontBold = context.createFont("montserrat-bold", os.joinPath(fontFolderPath, "Montserrat-Bold.ttf"))
-  doAssert not (fontBold == NoFont)
+  doAssert not (fontBold == NoFont) ]#
 
 
 proc createWindow(resizable: bool = true, width: int = 900, height: int = 500): Window =
@@ -65,7 +61,8 @@ proc createWindow(resizable: bool = true, width: int = 900, height: int = 500): 
 type
   Scene* = ref object of RootObj
     window: Window
-    context: Context
+    surface: ptr Surface
+    context: ptr Context
 
     width: int
     height: int
@@ -233,7 +230,7 @@ func project(point: Vec3[float], projection: Mat4x4[float]): Vec3[float] =
   result = vec3(res.x, res.y, res.z)
 
 
-proc draw*(context: Context, entity: Entity) =
+proc draw*(context: ptr Context, entity: Entity) =
   context.save()
 
   context.translate(entity.position.x, entity.position.y)
@@ -250,8 +247,7 @@ proc draw*(scene: Scene) =
 
   # discard context.currentTransform()
 
-  glViewport(0, 0, scene.frameBufferWidth, scene.frameBufferHeight)
-  context.beginFrame(scene.width.cfloat, scene.height.cfloat, scene.pixelRatio)
+  glViewport(0, 0, scene.frameBufferWidth, scene.frameBufferWidth)
 
   context.save()
   scene.scaleToUnit()
@@ -269,6 +265,34 @@ proc draw*(scene: Scene) =
     context.draw(intermediate)
 
   context.restore()
+  var linerGradient = patternCreateLinear(0.0, 0.0,  0.0, 256.0)
+  linerGradient.addColorStopRgba(1, 0, 0, 0, 1)
+  linerGradient.addColorStopRgba(0, 1, 1, 1, 1)
+  context.rectangle(0, 0, 256, 256)
+  context.setSource(linerGradient)
+  context.fill()
+  var radialGradient  = patternCreateRadial(115.2, 102.4, 25.6, 102.4,  102.4, 128.0)
+  radialGradient.addColorStopRgba(0, 1, 1, 1, 1)
+  radialGradient.addColorStopRgba(1, 0, 0, 0, 1)
+  context.setSource(radialGradient)
+  context.arc(128.0, 128.0 + sin(float(scene.time)/10.0) * 20, 76.8, 0, 2 * PI)
+  context.fill()
+
+  var dataPtr = scene.surface.getData()
+  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, scene.frameBufferWidth, scene.frameBufferWidth, GL_RGBA, GL_UNSIGNED_BYTE, dataPtr)
+
+  # draw a quad over the whole screen
+  glClear(GL_COLOR_BUFFER_BIT)
+  glBegin(GL_QUADS)
+  glTexCoord2d(0.0, 0.0)
+  glVertex2d(-1.0, +1.0)
+  glTexCoord2d(1.0, 0.0)
+  glVertex2d(+1.0, +1.0)
+  glTexCoord2d(1.0, 1.0)
+  glVertex2d(+1.0, -1.0)
+  glTexCoord2d(0.0, 1.0)
+  glVertex2d(-1.0, -1.0)
+  glEnd()
 
   #[ let dw = scene.width/len(scene.tweens)
 
@@ -284,8 +308,6 @@ proc draw*(scene: Scene) =
     context.roundedRect(i.float * dw.float, scene.height.float - 40, radius, 20, 5, 5, 5, 5)
     context.closePath()
     context.fill() ]#
-
-  context.endFrame()
 
 
 proc tick(scene: Scene) =
@@ -374,10 +396,11 @@ proc setupRendering(scene: var Scene, resizable: bool = true, width: int = 1920,
 
   makeContextCurrent(scene.window)
 
-  nvgInit(getProcAddress)
-  scene.context = createNVGContext()
+  scene.surface = imageSurfaceCreate(FORMAT_ARGB32, width.cint, height.cint)
+  scene.context = scene.surface.create()
 
   scene.context.loadFonts()
+
 
 
 proc runLiveRenderingLoop(scene: Scene) =
@@ -385,9 +408,6 @@ proc runLiveRenderingLoop(scene: Scene) =
   while not scene.window.shouldClose:
     scene.update()
     pollEvents()
-
-
-import winlean
 
 
 proc renderVideo(scene: Scene) =
@@ -461,12 +481,24 @@ proc render*(userScene: Scene, createVideo: bool = false, width: int = 1920, hei
 
   scene.setupRendering(not createVideo, width, height)
 
+  var data = scene.surface.getData()
+  glEnable(GL_TEXTURE_2D)
+  glTexImage2D(GL_TEXTURE_2D, 0, 3, width.cint, height.cint, 0, GL_RGBA, GL_UNSIGNED_BYTE, data)
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST.ord)
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST.ord)
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP.ord)
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP.ord)
+  glEnable(GL_TEXTURE_2D)
+
   if createVideo:
     scene.renderVideo()
   else:
     scene.runLiveRenderingLoop()
 
-  nvgDeleteContext(scene.context)
+  scene.context.destroy()
+  scene.surface.finish()
+  scene.surface.destroy()
+  scene.window.destroy()
   terminate()
 
 
