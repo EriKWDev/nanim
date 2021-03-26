@@ -7,7 +7,8 @@ import
 import entity
 
 
-type Circle = ref object of Entity
+type
+  Circle* = ref object of Entity
 
 
 proc init*(circle: Circle) =
@@ -15,7 +16,7 @@ proc init*(circle: Circle) =
   circle.tension = 0
 
 
-proc newCircle*(radius: float = 100.0): Entity =
+proc newCircle*(radius: float = 100.0): Circle =
   new(result)
   result.init()
 

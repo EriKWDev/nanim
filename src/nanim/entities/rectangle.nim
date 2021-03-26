@@ -7,7 +7,7 @@ import entity
 
 
 type
-  Rectangle = ref object of Entity
+  Rectangle* = ref object of Entity
 
 
 proc init*(rectangle: Rectangle) =
