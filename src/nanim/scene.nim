@@ -227,6 +227,10 @@ proc clearWithColor(color: Color = rgb(0, 0, 0)) =
           GL_STENCIL_BUFFER_BIT)
 
 
+proc startHere*(scene: Scene) =
+  scene.time = scene.tweens[high(scene.tweens)].startTime
+
+
 func project(point: Vec3[float], projection: Mat4x4[float]): Vec3[float] =
   let v4 = vec4(point.x, point.y, point.z, 1.0)
   let res = projection * v4
@@ -387,9 +391,6 @@ proc runLiveRenderingLoop(scene: Scene) =
     pollEvents()
 
 
-import winlean
-
-
 proc renderVideo(scene: Scene) =
   let
     width = 1920.cint
@@ -399,7 +400,9 @@ proc renderVideo(scene: Scene) =
     goalFps = 60.0
     goalDeltaTime = 1000.0/goalFps
 
-  scene.time = 0.0
+  # ? Maybe reset time here. It is probably unexpected through
+  # ? if the scene explicitly has a startHere() call...
+  # scene.time = 0.0
   scene.deltaTime = goalDeltaTime
 
   let rendersFolderPath = os.joinPath(os.getAppDir(), "renders")
@@ -414,16 +417,15 @@ proc renderVideo(scene: Scene) =
     "-pix_fmt", "rgba",
     "-s", $width & "x" & $height,
     "-r", $goalFps.int,
-    "-i", "-",  # Sets input to pipe
+    "-i", "-",  # * Sets input to pipe
 
-
-    "-vf", "vflip", # Flips the image vertically since glReadPixels is flipped
-    "-an",  # Don't expect audio,
-    # "-loglevel", "panic",  # Only log if something crashes
-    "-c:v", "libx264",  # H.264 encoding
-    "-preset", "slow",  # Should probably stay at fast/medium later
-    "-crf", "18",  # Ranges 0-51 indicates lossless compression to worst compression. Sane options are 0-30
-    "-tune", "animation",  # Tunes the encoder for animation and 'cartoons'
+    "-vf", "vflip", # * Flips the image vertically since glReadPixels gives flipped image
+    "-an",  # * Don't expect audio,
+    # "-loglevel", "panic",  # * Only log if something crashes
+    "-c:v", "libx264",  # * H.264 encoding
+    "-preset", "slow",  # * Should probably stay at fast/medium later
+    "-crf", "18",  # * Ranges 0-51 indicates lossless compression to worst compression. Sane options are 0-30
+    "-tune", "animation",  # * Tunes the encoder for animation and 'cartoons'
     "-pix_fmt", "yuv444p",
     outputVideoPath
   ]
@@ -467,6 +469,7 @@ proc render*(userScene: Scene, createVideo: bool = false, width: int = 1920, hei
     scene.runLiveRenderingLoop()
 
   nvgDeleteContext(scene.context)
+  scene.window.destroy()
   terminate()
 
 
