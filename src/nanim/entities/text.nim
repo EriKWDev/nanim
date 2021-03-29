@@ -19,8 +19,26 @@ proc init*(text: Text) =
   text.message = ""
 
 
+method draw*(text: Text, context: NVGContext) =
+  context.textAlign(text.horizontalAlignment, text.verticalAlignment)
+  context.fontSize(text.fontSize * 10)
+  context.fontFace(text.font)
+
+  context.beginPath()
+
+  context.fillColor(rgb(255, 56, 116))
+
+  context.strokeColor(rgb(230, 26, 94))
+  context.strokeWidth(20)
+
+  discard context.text(0, 0, text.message)
+  context.closePath()
+  context.stroke()
+  context.fill()
+
+
 proc newText*(message: string = "",
-              fontSize: float = 12,
+              fontSize: float = 8,
               font: string = "montserrat",
               horizontalAlignment: HorizontalAlign = haCenter,
               verticalAlignment: VerticalAlign = vaBaseline): Text =
@@ -33,17 +51,4 @@ proc newText*(message: string = "",
   result.verticalAlignment = verticalAlignment
 
 
-method draw*(text: Text, context: NVGContext) =
-  context.textAlign(text.horizontalAlignment, text.verticalAlignment)
-  context.fontSize(text.fontSize * 10)
-  context.fontFace(text.font)
-
-  context.strokeColor(rgb(230, 26, 94))
-  context.fillColor(rgb(255, 56, 116))
-  context.strokeWidth(20)
-
-  discard context.text(0, 0, text.message)
-
-  context.stroke()
-  context.fill()
 
