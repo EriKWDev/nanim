@@ -4,12 +4,20 @@ on: push
 
 jobs:
   nimble-test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     strategy:
       matrix:
-        nim: [ '1.4.0', 'stable', 'devel' ]
-    name: Nimble test with nim version ${{ matrix.nim }}
+        nim:
+          - '1.4.0'
+          - 'stable'
+          - 'devel'
+        os:
+          - 'ubuntu-latest'
+          - 'windows-latest'
+          - 'macOS-latest'
+
+    name: nimble test ${{ matrix.nim }}
     steps:
       - uses: actions/checkout@v2
 
