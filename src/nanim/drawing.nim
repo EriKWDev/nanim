@@ -93,7 +93,9 @@ proc gridPattern*(context: NVGContext, patternDrawer: proc(context: NVGContext) 
   context.endFrame()
 
   glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, imageData)
-  let image = context.createImageRGBA(width, height, {ifRepeatX, ifRepeatY, ifFlipY}, cast[ptr cuchar](imageData))
+  var pixels: seq[uint8] = newSeq[uint8](bufferSize)
+  copyMem(pixels[0].unsafeAddr, imageData, bufferSize)
+  let image = context.createImageRGBA(width, height, {ifRepeatX, ifRepeatY, ifFlipY}, pixels)
 
   patternPaint = context.imagePattern(0, 0, width.cfloat, height.cfloat, 0, image, 1.0)
   hasGatheredPattern = true
