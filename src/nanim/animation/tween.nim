@@ -11,7 +11,7 @@ type
     easing*: Easing
 
 
-const defaultDuration*: float = 1200.0
+const defaultDuration*: float = 1100.0
 
 
 proc evaluate*(tween: Tween, t: float) =

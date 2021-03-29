@@ -11,13 +11,11 @@ proc testScene(): Scene =
   var text = newText("Hello, World!", font="montserrat-thin")
   var rect = newSquare()
 
-  scene.add(circle1, circle2, text, rect, engon1)
+  scene.add(circle1, circle2, rect, engon1, text)
 
   discard circle1.move(150, 150)
   discard text.move(150, 150)
   discard engon1.move(10, 20)
-
-  scene.wait(5500)
 
   scene.wait(500)
   scene.showAllEntities()
@@ -42,27 +40,27 @@ proc testScene(): Scene =
 
   scene.play(rect.setTension(0.6))
 
-  # scene.startHere() # ! start animation here
   scene.wait(500)
 
   scene.play(circle1.pscale(1/5),
              circle2.scale(1/2),
              rect.pscale(1/3))
 
+  # scene.startHere() # ! start animation here
 
   scene.play(rect.setTension(0), rect.rotate(360*2), rect.pscale(4))
 
+  scene.wait(500)
+  scene.play(engon1.pstretch(4, 1))
+  scene.play(engon1.rotate(180))
+  scene.play(engon1.pstretch(1/8, 1/2))
+
+  scene.play(rect.move(600), rect.setCornerRadius(30))
+
   for i in 0..5:
-    scene.wait(500)
-    scene.play(engon1.move(100, 200))
-    scene.play(engon1.rotate(180))
-
-    scene.play(rect.move(600), rect.setCornerRadius(30))
-
-    for i in 0..15:
-      scene.play(rect.move(-20),
-                rect.rotate(-300),
-                rect.pscale(if i mod 2 == 0: 1.0/10.0 else: 10.0))
+    scene.play(rect.move(-20),
+              rect.rotate(-300),
+              rect.pscale(if i mod 2 == 0: 1.0/10.0 else: 10.0))
 
   scene.wait(500)
 
@@ -70,4 +68,7 @@ proc testScene(): Scene =
 
 
 when isMainModule:
-  render(testScene, defined(video))
+  when defined(release):
+    render1440p(testScene)
+  else:
+    render(testScene)

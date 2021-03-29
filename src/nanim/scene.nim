@@ -17,7 +17,9 @@ import
   entities/entity,
 
   animation/tween,
-  animation/easings
+  animation/easings,
+
+  drawing
 
 
 proc createNVGContext(): Context =
@@ -65,12 +67,13 @@ proc createWindow(resizable: bool = true, width: int = 900, height: int = 500): 
 type
   Scene* = ref object of RootObj
     window: Window
-    context: Context
+    context*: Context
 
-    width: int
-    height: int
+    width*: int
+    height*: int
 
-    time: float
+    time*: float
+    restartTime: float
     lastUpdateTime: float
     lastTickTime: float
     deltaTime: float
@@ -78,18 +81,18 @@ type
     frameBufferWidth: int32
     frameBufferHeight: int32
 
-    tweens: seq[Tween]
+    tweens*: seq[Tween]
 
     currentTweens: seq[Tween]
     oldTweens: seq[Tween]
     futureTweens: seq[Tween]
 
-    entities: seq[Entity]
+    entities*: seq[Entity]
     projectionMatrix*: Mat4x4[float]
 
     pixelRatio: float
 
-    done: bool
+    done*: bool
 
 
 proc scale*(scene: Scene, d: float = 0): Tween =
@@ -152,6 +155,7 @@ proc move*(scene: Scene, dx: float = 0, dy: float = 0, dz: float = 0): Tween =
 proc newScene*(): Scene =
   new(result)
   result.time = cpuTime()
+  result.restartTime = result.time
   result.lastUpdateTime = -100.0
   result.lastTickTime = -100.0
   result.tweens = @[]
@@ -220,13 +224,6 @@ proc scaleToUnit(scene: Scene, fraction: float = 1000f) =
   scene.context.scale(unit, unit)
 
 
-proc clearWithColor(color: Color = rgb(0, 0, 0)) =
-  glClearColor(color.r, color.g, color.b, color.a)
-  glClear(GL_COLOR_BUFFER_BIT or
-          GL_DEPTH_BUFFER_BIT or
-          GL_STENCIL_BUFFER_BIT)
-
-
 proc startHere*(scene: Scene) =
   scene.time = scene.tweens[high(scene.tweens)].startTime
 
@@ -237,27 +234,23 @@ func project(point: Vec3[float], projection: Mat4x4[float]): Vec3[float] =
   result = vec3(res.x, res.y, res.z)
 
 
-proc draw*(context: Context, entity: Entity) =
-  context.save()
+proc draw*(scene: Scene, entity: Entity) =
+  scene.context.save()
 
-  context.translate(entity.position.x, entity.position.y)
-  context.scale(entity.scaling.x, entity.scaling.y)
-  context.rotate(entity.rotation)
+  scene.context.translate(entity.position.x, entity.position.y)
+  scene.context.scale(entity.scaling.x, entity.scaling.y)
+  scene.context.rotate(entity.rotation)
 
-  entity.draw(context)
+  entity.draw(scene.context)
 
-  context.restore()
+  scene.context.restore()
 
 
 proc draw*(scene: Scene) =
-  let context = scene.context
-
-  # discard context.currentTransform()
-
   glViewport(0, 0, scene.frameBufferWidth, scene.frameBufferHeight)
-  context.beginFrame(scene.width.cfloat, scene.height.cfloat, scene.pixelRatio)
+  scene.context.beginFrame(scene.width.cfloat, scene.height.cfloat, scene.pixelRatio)
 
-  context.save()
+  scene.context.save()
   scene.scaleToUnit()
 
   clearWithColor(rgb(255, 255, 255))
@@ -270,26 +263,10 @@ proc draw*(scene: Scene) =
                                        proc(point: Vec3[float]): Vec3[float] =
                                          point.project(scene.projectionMatrix))
 
-    context.draw(intermediate)
+    scene.draw(intermediate)
 
-  context.restore()
-
-  #[ let dw = scene.width/len(scene.tweens)
-
-  for i, tween in scene.tweens:
-    if tween in scene.currentTweens:
-       context.fillColor(rgb(60, 160, 60))
-    else:
-       context.fillColor(rgb(100, 100, 100))
-
-    let radius = min(dw, (tween.duration/defaultDuration)*dw)
-
-    context.beginPath()
-    context.roundedRect(i.float * dw.float, scene.height.float - 40, radius, 20, 5, 5, 5, 5)
-    context.closePath()
-    context.fill() ]#
-
-  context.endFrame()
+  scene.context.restore()
+  scene.context.endFrame()
 
 
 proc tick(scene: Scene) =
@@ -320,9 +297,9 @@ proc tick(scene: Scene) =
       scene.currentTweens.add(tween)
 
 
-  when not defined(release):
-    let progress = (len(scene.oldTweens) + len(scene.currentTweens)) / len(scene.tweens)
-    stdout.write "\r" & $len(scene.oldTweens) & ":" & $len(scene.currentTweens) & ":" & $len(scene.futureTweens) & " --- " & $(round(progress * 100)) & "%"
+  # when not defined(release):
+    # let progress = (len(scene.oldTweens) + len(scene.currentTweens)) / len(scene.tweens)
+    # stdout.write "\r" & $len(scene.oldTweens) & ":" & $len(scene.currentTweens) & ":" & $len(scene.futureTweens) & " --- " & $(round(progress * 100)) & "%"
 
   for tween in scene.oldTweens & scene.futureTweens.reversed():
     tween.evaluate(scene.time)
@@ -331,8 +308,6 @@ proc tick(scene: Scene) =
     tween.evaluate(scene.time)
 
   scene.draw()
-
-  swapBuffers(scene.window)
 
   scene.lastTickTime = cpuTime() * 1000
 
@@ -364,7 +339,6 @@ proc setupCallbacks(scene: Scene) =
 
   scene.window.windowRefreshCb = proc(w: Window) =
     scene.tick()
-    w.swapBuffers()
 
 
 proc setupRendering(scene: var Scene, resizable: bool = true, width: int = 1920, height: int = 1080) =
@@ -388,17 +362,120 @@ proc runLiveRenderingLoop(scene: Scene) =
   # TODO: Make scene.update loop be on a separate thread. That would allow rendering even while user is dragging window...
   while not scene.window.shouldClose:
     scene.update()
+    swapBuffers(scene.window)
     pollEvents()
+
+  scene.window.destroy()
+
+
+proc renderVideoWithPipe(scene: Scene) =
+  let
+    (width, height) = scene.window.size
+    rgbaSize = sizeof(cint)
+    bufferSize: int = width * height * rgbaSize
+    goalFps = 60
+    goalDeltaTime = 1000.0/goalFps.float
+
+  # ? Maybe reset time here. It is probably unexpected through
+  # ? if the scene explicitly has a startHere() call...
+  # scene.time = 0.0
+  scene.deltaTime = goalDeltaTime
+
+  let rendersFolderPath = os.joinPath(os.getAppDir(), "renders")
+  let partsFolderPath = os.joinPath(rendersFolderPath, "parts")
+  createDir(partsFolderPath)
+
+  # * ffmpeg -y -f rawvideo -pix_fmt rgba -s 1920x1080 -r 60 -i - -vf vflip -an -c:v libx264 -preset fast -crf 18 -tune animation -pix_fmt yuv444p
+  let ffmpegOptions = @[
+    "-y",
+    "-f", "rawvideo",
+    "-pix_fmt", "rgba",
+    "-s", $width & "x" & $height,
+    "-r", $goalFps,
+    "-i", "-", # * Set input to pipe
+    "-vf", "vflip", # * Flips the image vertically since glReadPixels gives flipped image
+    "-an",  # * Don't expect audio,
+    # "-loglevel", "panic",
+    "-c:v", "libx264",  # * H.264 encoding
+    "-preset", "fast",  # * Should probably stay at fast/medium later
+    "-crf", "18",  # * Ranges 0-51 indicates lossless compression to worst compression. Sane options are 0-30
+    "-tune", "animation",  # * Tunes the encoder for animation and 'cartoons'
+    "-pix_fmt", "yuv444p" # * Minimal color data loss on H.264 encode
+  ]
+
+  var
+    ffmpegProcess: Process
+    data = alloc(bufferSize)
+
+  let
+    partsFileName = os.joinPath(partsFolderPath, "parts.txt")
+    partsFile = open(partsFileName, fmWrite)
+
+  proc startFFMpeg(n: int = 0): Process =
+    let partName = os.joinPath(partsFolderPath, "scene_" & $n & ".mp4")
+    partsFile.writeLine("file '" & partName & "'")
+    partsFile.flushFile()
+
+    startProcess("ffmpeg", "", ffmpegOptions & partName, options = {poUsePath, poEchoCmd})
+
+  proc closeFFMpeg() =
+    ffmpegProcess.inputStream().flush()
+    ffmpegProcess.close()
+
+  proc restartFFMPeg(n: int = 0) =
+    closeFFMpeg()
+    ffmpegProcess = startFFMpeg(n)
+
+  proc writeToFFMpeg(info: pointer, size: int) =
+    ffmpegProcess.inputStream().writeData(info, size)
+
+  var
+    i = 0
+    n = 0
+  ffmpegProcess = startFFMpeg(i)
+  while not scene.done:
+    i = i + 1
+    n = n + 1
+    pollEvents()
+
+    scene.tick()
+    scene.time = scene.time + goalDeltaTime
+
+    glPixelStorei(GL_PACK_ALIGNMENT, 1)
+    glReadBuffer(GL_BACK)
+    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data)
+    swapBuffers(scene.window)
+
+    try:
+      if bufferSize * n > 4000000000:
+        restartFFMPeg(i)
+        n = 0
+
+      writeToFFMpeg(data, bufferSize)
+    except:
+      let msg = getCurrentExceptionMsg()
+      echo msg
+      scene.done = true
+
+    if scene.done:
+      scene.window.shouldClose = true
+
+  partsFile.close()
+  dealloc(data)
+  scene.window.destroy()
+  closeFFMpeg()
+
+  let res = execShellCmd("ffmpeg -y -f concat -safe 0 -loglevel panic -i " & partsFileName & " -c copy " & os.joinPath(rendersFolderPath, "final.mp4"))
+  doAssert res == 0
 
 
 proc renderVideo(scene: Scene) =
   let
-    width = 1920.cint
-    height = 1080.cint
+    (width, height) = scene.window.size
     rgbaSize = sizeof(cint)
     bufferSize: int = width * height * rgbaSize
-    goalFps = 60.0
-    goalDeltaTime = 1000.0/goalFps
+    goalFps = 60
+    goalDeltaTime = 1000.0/goalFps.float
 
   # ? Maybe reset time here. It is probably unexpected through
   # ? if the scene explicitly has a startHere() call...
@@ -408,42 +485,32 @@ proc renderVideo(scene: Scene) =
   let rendersFolderPath = os.joinPath(os.getAppDir(), "renders")
 
   createDir(rendersFolderPath)
-
-  let outputVideoPath = os.joinPath(rendersFolderPath, "scene.mp4")
-
-  let ffmpegOptions = @[
-    "-y",
-    "-f", "rawvideo",
-    "-pix_fmt", "rgba",
-    "-s", $width & "x" & $height,
-    "-r", $goalFps.int,
-    "-i", "-",  # * Sets input to pipe
-
-    "-vf", "vflip", # * Flips the image vertically since glReadPixels gives flipped image
-    "-an",  # * Don't expect audio,
-    # "-loglevel", "panic",  # * Only log if something crashes
-    "-c:v", "libx264",  # * H.264 encoding
-    "-preset", "slow",  # * Should probably stay at fast/medium later
-    "-crf", "18",  # * Ranges 0-51 indicates lossless compression to worst compression. Sane options are 0-30
-    "-tune", "animation",  # * Tunes the encoder for animation and 'cartoons'
-    "-pix_fmt", "yuv444p",
-    outputVideoPath
-  ]
-
-  let ffmpegProcess = startProcess("ffmpeg", "", ffmpegOptions, options = {poUsePath, poEchoCmd})
+  # let ffmpegProcess = startProcess("ffmpeg", "", ffmpegOptions, options = {poUsePath, poEchoCmd})
   var data = alloc(bufferSize)
 
+  let dataFilePath = os.joinPath(rendersFolderPath, "data.txt")
+  var dataFile = open(dataFilePath, fmReadWrite)
+
+  var i = 0
   while not scene.window.shouldClose:
+    i = i + 1
     pollEvents()
 
     scene.tick()
     scene.time = scene.time + goalDeltaTime
 
     glPixelStorei(GL_PACK_ALIGNMENT, 1)
+    glReadBuffer(GL_BACK)
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data)
 
+    swapBuffers(scene.window)
+
     try:
-      ffmpegProcess.inputStream().writeData(data, bufferSize)
+      if i mod goalFps == 0:
+        dataFile.flushFile()
+
+      let writtenBytes = dataFile.writeBuffer(data, bufferSize)
+      doAssert writtenBytes == bufferSize
     except:
       let
         msg = getCurrentExceptionMsg()
@@ -454,8 +521,40 @@ proc renderVideo(scene: Scene) =
       scene.window.shouldClose = true
 
   dealloc(data)
-  close(ffmpegProcess)
-  discard waitForExit(ffmpegProcess)
+  scene.window.destroy()
+  dataFile.flushFile()
+  close(dataFile)
+
+  let outputVideoPath = os.joinPath(rendersFolderPath, "scene.mp4")
+
+  # * ffmpeg -y -f rawvideo -pix_fmt rgba -s 1920x1080 -r 60 -i - -vf vflip -an -c:v libx264 -preset fast -crf 18 -tune animation -pix_fmt yuv444p
+  let ffmpegOptions = @[
+    "-y",
+    "-f", "rawvideo",
+    "-pix_fmt", "rgba",
+    "-s", $width & "x" & $height,
+    "-r", $goalFps,
+    "-i", dataFilePath, # * Currently, the temporary data file si used. Would like to get pipes working but startProcess in nim is a bit clunky...
+    "-vf", "vflip", # * Flips the image vertically since glReadPixels gives flipped image
+    "-an",  # * Don't expect audio,
+    # "-loglevel", "panic",
+    "-c:v", "libx264",  # * H.264 encoding
+    "-preset", "fast",  # * Should probably stay at fast/medium later
+    "-crf", "18",  # * Ranges 0-51 indicates lossless compression to worst compression. Sane options are 0-30
+    "-tune", "animation",  # * Tunes the encoder for animation and 'cartoons'
+    "-pix_fmt", "yuv444p", # * Minimal color data loss on H.264 encode
+    outputVideoPath
+  ]
+  # startProcess("ffmpeg", "", ffmpegOptions, options = {poUsePath, poEchoCmd})
+
+  var command = "ffmpeg"
+  for option in ffmpegOptions:
+    command &= " " & option
+
+  echo command
+
+  let res = execShellCmd(command)
+  doAssert res == 0
 
 
 proc render*(userScene: Scene, createVideo: bool = false, width: int = 1920, height: int = 1080) =
@@ -464,14 +563,23 @@ proc render*(userScene: Scene, createVideo: bool = false, width: int = 1920, hei
   scene.setupRendering(not createVideo, width, height)
 
   if createVideo:
-    scene.renderVideo()
+    when defined(oldRenderer): scene.renderVideo()
+    else: scene.renderVideoWithPipe()
   else:
     scene.runLiveRenderingLoop()
 
   nvgDeleteContext(scene.context)
-  scene.window.destroy()
   terminate()
 
 
 proc render*(userSceneCreator: proc(): Scene, createVideo: bool = false, width: int = 1920, height: int = 1080) =
   render(userSceneCreator(), createVideo, width, height)
+
+template createRenderConfig(name: untyped, width: int, height: int) =
+  proc name*(userScene: Scene) = render(userScene, true, width, height)
+  proc name*(userSceneCreator: proc(): Scene) = render(userSceneCreator(), true, width, height)
+
+createRenderConfig(renderFullHD, 1920, 1080)
+createRenderConfig(render1080p, 1920, 1080)
+createRenderConfig(render1440p, 2880, 1440)
+createRenderConfig(render4K, 3840, 2160)
