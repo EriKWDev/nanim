@@ -71,7 +71,6 @@ var
   hasGatheredPattern = false
 
 proc gridPattern*(context: NVGContext, patternDrawer: proc(context: NVGContext) = defaultPattern, width: cint = 10, height: cint = 10): Paint =
-
   # Impure, but worth it for the performance benefit...
   if hasGatheredPattern:
     return patternPaint
