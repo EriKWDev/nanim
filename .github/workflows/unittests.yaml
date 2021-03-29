@@ -9,7 +9,7 @@ jobs:
     strategy:
       matrix:
         nim:
-          - '1.4.0'
+          - '1.4.2'
           - 'stable'
           - 'devel'
         os:
