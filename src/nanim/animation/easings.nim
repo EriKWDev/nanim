@@ -66,7 +66,7 @@ func cubicBezier*(t: float = 0.0, cpx1, cpy1, cpx2, cpy2: float): float =
 
 func smoothOvershoot*(t: float): float = cubicBezier(t, 1.0, -0.3, 0.12, 1.22)
 
-const defaultEasing* = sigmoid4
+const defaultEasing* = sigmoid3
 
 
 # Interpolation of sequence of points
