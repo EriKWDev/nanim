@@ -1,5 +1,9 @@
 <h1 align="center">Nanim</h1>
 <p align="center">"Totally not <a href="https://github.com/3b1b/manim/">manim</a> in nim" - Erik</p>
+<p align="center">
+  <img src="https://github.com/EriKWDev/nanim/actions/workflows/unittests.yaml/badge.svg?branch=main">
+</p>
+
 
 ### About
 Nanim is an easy-to-use framework to create smooth GPU-accelerated animations that can be previewed live inside a glfw window and, when ready, rendered to videos at an arbetrary resolution and framerate.
