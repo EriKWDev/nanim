@@ -2,6 +2,7 @@
 import
   unittest,
   nanim,
+  tables,
   utils
 
 
@@ -113,3 +114,69 @@ suite "Interpolations & Easings tests":
     check interpolate(0.0, 1.0, 0.5) ~= 0.5
     check interpolate(100.0, 150.0, 0.5) ~= 125.0
     check interpolate(-100.0, 100.0, 0.5) ~= 0.0
+
+
+  test "Simple Tracks":
+    let scene = newScene()
+    check scene.tweenTracks.len() == 1
+
+    var
+      circle = newCircle()
+      rectangle = newRectangle()
+
+    scene.add(circle, rectangle)
+    scene.play(circle.move(100))
+    scene.wait(2500)
+
+    scene.switchTrack(2)
+    scene.play(rectangle.move(100))
+    check scene.tweenTracks.len() == 2
+
+    scene.wait(1500)
+
+    scene.syncTracks()
+    check scene.getLatestTween().duration ~= 1000.0
+
+
+  test "Simple Tweens":
+    var entity = newBestagon()
+
+    let
+      oldPosition = entity.position
+      moveTween1 = entity.move(100, 200)
+
+    check entity.position.x ~= (oldPosition.x + 100.0)
+    check entity.position.y ~= (oldPosition.y + 200.0)
+
+    moveTween1.evaluate(0.0)
+
+    check entity.position.x ~= oldPosition.x
+    check entity.position.y ~= oldPosition.y
+
+    moveTween1.evaluate(defaultDuration)
+
+    check entity.position.x ~= (oldPosition.x + 100.0)
+    check entity.position.y ~= (oldPosition.y + 200.0)
+
+    let
+      moveTween2 = entity.move(100, 100)
+      tweenTrack = newTweenTrack()
+
+    moveTween2.startTime = defaultDuration
+    tweenTrack.add(moveTween1, moveTween2)
+    tweenTrack.evaluate(0)
+
+    check entity.position.x ~= oldPosition.x
+    check entity.position.y ~= oldPosition.y
+
+    tweenTrack.evaluate(defaultDuration)
+
+    check entity.position.x ~= (oldPosition.x + 100.0)
+    check entity.position.y ~= (oldPosition.y + 200.0)
+
+    tweenTrack.evaluate(defaultDuration*2)
+
+    check entity.position.x ~= (oldPosition.x + 100.0 + 100.0)
+    check entity.position.y ~= (oldPosition.y + 200.0 + 100.0)
+
+
