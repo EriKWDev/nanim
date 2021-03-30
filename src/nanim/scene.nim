@@ -174,7 +174,8 @@ proc newScene*(): Scene =
 
 
 func getLatestTween(scene: Scene): Tween =
-  scene.tweenTracks.mgetOrPut(scene.currentTweenTrackId, newTweenTrack()).getLatestTween()
+  discard scene.tweenTracks.hasKeyOrPut(scene.currentTweenTrackId, newTweenTrack())
+  return scene.tweenTracks[scene.currentTweenTrackId].getLatestTween()
 
 
 proc add*(scene: Scene, entities: varargs[Entity]) =
@@ -198,10 +199,11 @@ proc animate*(scene: Scene, tweens: varargs[Tween]) =
   except IndexDefect:
     previousEndTime = 0.0
 
-
-  for tween in @tweens:
+  for tween in tweens:
     tween.startTime = previousEndTime
-    scene.tweenTracks.mgetOrPut(scene.currentTweenTrackId, newTweenTrack()).add(tween)
+
+  discard scene.tweenTracks.hasKeyOrPut(scene.currentTweenTrackId, newTweenTrack())
+  scene.tweenTracks[scene.currentTweenTrackId].add(tweens)
 
 
 proc play*(scene: Scene, tweens: varargs[Tween]) =
@@ -209,13 +211,45 @@ proc play*(scene: Scene, tweens: varargs[Tween]) =
 
 
 proc wait*(scene: Scene, duration: float = defaultDuration) =
-  var interpolators: seq[proc(t: float)]
-
-  interpolators.add(proc(t: float) = discard)
-
-  scene.animate(newTween(interpolators,
+  scene.animate(newTween(@[],
                          linear,
                          duration))
+
+
+proc syncTracks*(scene: Scene, trackIds: varargs[int]) =
+  var ids: seq[int]
+
+  for id in trackIds:
+      ids &= id
+
+  if len(ids) == 0:
+    for key in scene.tweenTracks.keys:
+      ids &= key
+
+  var waitEndTime = 0.0
+
+  for id in ids:
+    discard scene.tweenTracks.hasKeyOrPut(id, newTweenTrack())
+
+    let
+      lastTweenOnTrack = scene.tweenTracks[id].getLatestTween()
+      lastTweenEndTime = lastTweenOnTrack.startTime + lastTweenOnTrack.duration
+
+    if lastTweenEndTime > waitEndTime:
+      waitEndTime = lastTweenEndTime
+
+  let oldId = scene.currentTweenTrackId
+
+  for id in ids:
+    scene.switchTrack(id)
+    let
+      latestTween = scene.getLatestTween()
+      waitDuration = waitEndTime - (latestTween.startTime + latestTween.duration)
+
+    if waitDuration > 0:
+      scene.wait(waitDuration)
+
+  scene.switchTrack(oldId)
 
 
 proc show*(scene: Scene, entity: Entity) =
@@ -231,24 +265,25 @@ proc showAllEntities*(scene: Scene) =
   scene.play(tweens)
 
 
-proc scaleToUnit(scene: Scene, fraction: float = 1000f) =
+proc scaleToUnit(scene: Scene, fraction: float = 1000f, compensate: bool = true) =
   let n = min(scene.width, scene.height).float
   let d = max(scene.width, scene.height).float
 
-  let compensation = (d - n)/2f
-
   let unit = n / fraction
 
-  if scene.width > scene.height:
-    scene.context.translate(compensation, 0f)
-  else:
-    scene.context.translate(0f, compensation)
+  if compensate:
+    let compensation = (d - n)/2f
+    if scene.width > scene.height:
+      scene.context.translate(compensation, 0f)
+    else:
+      scene.context.translate(0f, compensation)
 
   scene.context.scale(unit, unit)
 
 
 proc startHere*(scene: Scene) =
-  scene.time = scene.getLatestTween().startTime
+  let latestTween = scene.getLatestTween()
+  scene.time = latestTween.startTime + latestTween.duration
 
 
 func project(point: Vec3[float], projection: Mat4x4[float]): Vec3[float] =
@@ -272,6 +307,60 @@ proc draw*(scene: Scene, entity: Entity) =
   scene.context.restore()
 
 
+proc visualizeTracks(scene: Scene) =
+  scene.context.save()
+  scene.scaleToUnit(compensate=true)
+  let
+    numberOfTracks = scene.tweenTracks.len()
+    trackHeight = min(100.0/numberOfTracks.float, 30)
+
+  var endTime: float = -1
+
+  for track in scene.tweenTracks.values:
+    let endTween = track.getLatestTween()
+    if endTween.startTime + endTween.duration > endTime:
+      endTime = endTween.startTime + endTween.duration
+
+  let unit = 1000.0
+
+  var i = 0
+  for id, track in scene.tweenTracks.pairs:
+    scene.context.fillColor(rgb(100, 100, 200))
+    scene.context.textAlign(haLeft, vaMiddle)
+    discard scene.context.text(-80, (i.float + 0.5) * trackHeight, "Track #" & $(id))
+
+    for tween in track.tweens:
+      scene.context.fillColor(rgb(100, 100, 200))
+      if tween.interpolators.len() == 0:
+        scene.context.strokeColor(rgb(100, 200, 100))
+
+      scene.context.beginPath()
+      scene.context.roundedRect(tween.startTime/endTime * unit + 5,
+                                i.float * trackHeight + 5,
+                                tween.duration/endTime * unit - 5,
+                                trackHeight - 5,
+                                10)
+      scene.context.closePath()
+
+      if tween.interpolators.len() == 0:
+        scene.context.strokeWidth(2)
+        scene.context.stroke()
+      else:
+        scene.context.fill()
+
+    i = i + 1
+
+  scene.context.fillColor(rgb(100, 200, 200))
+  scene.context.beginPath()
+  let x = scene.time/endTime * unit
+  scene.context.circle(x, 5, 5)
+  scene.context.rect(x, 5, 2, trackHeight * numberOfTracks.float)
+  scene.context.closePath()
+  scene.context.fill()
+
+  scene.context.restore()
+
+
 proc draw*(scene: Scene) =
   glViewport(0, 0, scene.frameBufferWidth, scene.frameBufferHeight)
   scene.context.beginFrame(scene.width.cfloat, scene.height.cfloat, scene.pixelRatio)
@@ -283,6 +372,7 @@ proc draw*(scene: Scene) =
   for entity in scene.entities:
     var intermediate = entity.deepCopy()
 
+    # TODO: Decide what to do with entity.children here...
     # Apply the scene's projection matrix to every point of every entity
     intermediate.points = sequtils.map(intermediate.points,
                                        proc(point: Vec3[float]): Vec3[float] =
@@ -291,7 +381,10 @@ proc draw*(scene: Scene) =
     scene.draw(intermediate)
 
   scene.foreground(scene)
+
   scene.context.restore()
+  scene.visualizeTracks()
+
   scene.context.endFrame()
 
 

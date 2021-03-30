@@ -51,9 +51,7 @@ proc testScene(): Scene =
   scene.play(rect.setTension(0), rect.rotate(360*2), rect.pscale(4))
 
   scene.wait(500)
-  scene.play(engon1.pstretch(4, 1))
   scene.play(engon1.rotate(180))
-  scene.play(engon1.pstretch(1/8, 1/2))
 
   scene.play(rect.move(600), rect.setCornerRadius(30))
 
