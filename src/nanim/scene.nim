@@ -173,7 +173,7 @@ proc newScene*(): Scene =
   result.foreground = proc(scene: Scene) = discard
 
 
-func getLatestTween(scene: Scene): Tween =
+func getLatestTween*(scene: Scene): Tween =
   discard scene.tweenTracks.hasKeyOrPut(scene.currentTweenTrackId, newTweenTrack())
   return scene.tweenTracks[scene.currentTweenTrackId].getLatestTween()
 
