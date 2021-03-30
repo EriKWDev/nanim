@@ -1,4 +1,7 @@
 
+import algorithm
+
+
 import easings
 
 
@@ -10,6 +13,15 @@ type
     interpolators*: seq[proc(t: float)]
     easing*: Easing
 
+  TweenTrack* = ref object of RootObj
+    tweens*: seq[Tween]
+
+    currentTweens: seq[Tween]
+    oldTweens: seq[Tween]
+    futureTweens: seq[Tween]
+
+    done*: bool
+
 
 const defaultDuration*: float = 1100.0
 
@@ -19,6 +31,42 @@ proc evaluate*(tween: Tween, t: float) =
 
   for interpolator in tween.interpolators:
     interpolator(alpha)
+
+
+proc evaluate*(tweenTrack: TweenTrack, time: float) =
+  # By first evaluating all future tweens in reverse order, then old tweens and
+  # finally the current ones, we assure that all tween's have been reset and/or
+  # completed correctly.
+  tweenTrack.oldTweens = @[]
+  tweenTrack.currentTweens = @[]
+  tweenTrack.futureTweens = @[]
+
+  for tween in tweenTrack.tweens:
+    if time  > tween.startTime + tween.duration:
+      tweenTrack.oldTweens.add(tween)
+    elif time  < tween.startTime:
+      tweenTrack.futureTweens.add(tween)
+    else:
+      tweenTrack.currentTweens.add(tween)
+
+  for tween in tweenTrack.oldTweens & tweenTrack.futureTweens.reversed():
+    tween.evaluate(time)
+
+  for tween in tweenTrack.currentTweens:
+    tween.evaluate(time)
+
+  tweenTrack.done = false
+
+  if len(tweenTrack.oldTweens) == len(tweenTrack.tweens) and len(tweenTrack.futureTweens) == 0:
+    tweenTrack.done = true
+
+
+proc add*(tweenTrack: TweenTrack, tweens: varargs[Tween]) =
+  tweenTrack.tweens.add(tweens)
+
+
+func getLatestTween*(tweenTrack: TweenTrack): Tween =
+  return tweenTrack.tweens[high(tweenTrack.tweens)]
 
 
 proc init(tween: Tween, interpolators: seq[proc(t: float)], easing: Easing, duration: float) =
@@ -33,3 +81,17 @@ func newTween*(interpolators: seq[proc(t: float)], easing: proc(t: float): float
               easing,
               duration)
 
+
+proc init(tweenTrack: TweenTrack, tweens: seq[Tween] = @[]) =
+  tweenTrack.tweens = tweens
+
+  tweenTrack.currentTweens = @[]
+  tweenTrack.oldTweens = @[]
+  tweenTrack.futureTweens = @[]
+
+  tweenTrack.done = false
+
+
+func newTweenTrack*(tweens: seq[Tween] = @[]): TweenTrack =
+  new(result)
+  result.init(tweens)
