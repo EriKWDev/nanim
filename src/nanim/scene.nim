@@ -6,11 +6,11 @@ import
   opengl,
   os,
   times,
-  algorithm,
   sequtils,
   osproc,
   math,
-  streams
+  streams,
+  tables
 
 
 import
@@ -64,6 +64,8 @@ proc createWindow(resizable: bool = true, width: int = 900, height: int = 500): 
   return window
 
 
+const DefaultTrackId = 0
+
 type
   Scene* = ref object of RootObj
     window: Window
@@ -71,6 +73,9 @@ type
 
     width*: int
     height*: int
+
+    background*: proc(scene: Scene)
+    foreground*: proc(scene: Scene)
 
     time*: float
     restartTime: float
@@ -81,11 +86,8 @@ type
     frameBufferWidth: int32
     frameBufferHeight: int32
 
-    tweens*: seq[Tween]
-
-    currentTweens: seq[Tween]
-    oldTweens: seq[Tween]
-    futureTweens: seq[Tween]
+    currentTweenTrackId*: int
+    tweenTracks*: Table[int, TweenTrack]
 
     entities*: seq[Entity]
     projectionMatrix*: Mat4x4[float]
@@ -95,7 +97,7 @@ type
     done*: bool
 
 
-proc scale*(scene: Scene, d: float = 0): Tween =
+proc pscale*(scene: Scene, d: float = 0): Tween =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -114,7 +116,7 @@ proc scale*(scene: Scene, d: float = 0): Tween =
                     defaultDuration)
 
 
-proc rotate*(scene: Scene, angle: float = 0): Tween =
+proc protate*(scene: Scene, angle: float = 0): Tween =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -133,7 +135,7 @@ proc rotate*(scene: Scene, angle: float = 0): Tween =
                     defaultDuration)
 
 
-proc move*(scene: Scene, dx: float = 0, dy: float = 0, dz: float = 0): Tween =
+proc pmove*(scene: Scene, dx: float = 0, dy: float = 0, dz: float = 0): Tween =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -158,23 +160,40 @@ proc newScene*(): Scene =
   result.restartTime = result.time
   result.lastUpdateTime = -100.0
   result.lastTickTime = -100.0
-  result.tweens = @[]
+  result.tweenTracks = initTable[int, TweenTrack]()
+  result.currentTweenTrackId = DefaultTrackId
+
+  result.tweenTracks[result.currentTweenTrackId] = newTweenTrack()
   result.projectionMatrix = mat4x4[float](vec4[float](1,0,0,0),
                                           vec4[float](0,1,0,0),
                                           vec4[float](0,0,1,0),
                                           vec4[float](0,0,0,1))
   result.done = false
+  result.background = proc(scene: Scene) = clearWithColor(rgb(255, 255, 255))
+  result.foreground = proc(scene: Scene) = discard
+
+
+func getLatestTween(scene: Scene): Tween =
+  scene.tweenTracks.mgetOrPut(scene.currentTweenTrackId, newTweenTrack()).getLatestTween()
 
 
 proc add*(scene: Scene, entities: varargs[Entity]) =
   scene.entities.add(@entities)
 
 
+proc switchTrack*(scene: Scene, newTrackId: int = DefaultTrackId) =
+  scene.currentTweenTrackId = newTrackId
+
+
+proc switchToDefaultTrack*(scene: Scene) =
+  scene.switchTrack(DefaultTrackId)
+
+
 proc animate*(scene: Scene, tweens: varargs[Tween]) =
   var previousEndtime: float
 
   try:
-    let previousTween = scene.tweens[high(scene.tweens)]
+    let previousTween = scene.getLatestTween()
     previousEndTime = previousTween.startTime + previousTween.duration
   except IndexDefect:
     previousEndTime = 0.0
@@ -182,11 +201,11 @@ proc animate*(scene: Scene, tweens: varargs[Tween]) =
 
   for tween in @tweens:
     tween.startTime = previousEndTime
-    scene.tweens.add(tween)
+    scene.tweenTracks.mgetOrPut(scene.currentTweenTrackId, newTweenTrack()).add(tween)
 
 
 proc play*(scene: Scene, tweens: varargs[Tween]) =
-    scene.animate(tweens)
+  scene.animate(tweens)
 
 
 proc wait*(scene: Scene, duration: float = defaultDuration) =
@@ -197,6 +216,10 @@ proc wait*(scene: Scene, duration: float = defaultDuration) =
   scene.animate(newTween(interpolators,
                          linear,
                          duration))
+
+
+proc show*(scene: Scene, entity: Entity) =
+  scene.play(entity.show())
 
 
 proc showAllEntities*(scene: Scene) =
@@ -225,7 +248,7 @@ proc scaleToUnit(scene: Scene, fraction: float = 1000f) =
 
 
 proc startHere*(scene: Scene) =
-  scene.time = scene.tweens[high(scene.tweens)].startTime
+  scene.time = scene.getLatestTween().startTime
 
 
 func project(point: Vec3[float], projection: Mat4x4[float]): Vec3[float] =
@@ -241,6 +264,9 @@ proc draw*(scene: Scene, entity: Entity) =
   scene.context.scale(entity.scaling.x, entity.scaling.y)
   scene.context.rotate(entity.rotation)
 
+  for child in entity.children:
+    scene.draw(child)
+
   entity.draw(scene.context)
 
   scene.context.restore()
@@ -252,8 +278,7 @@ proc draw*(scene: Scene) =
 
   scene.context.save()
   scene.scaleToUnit()
-
-  clearWithColor(rgb(255, 255, 255))
+  scene.background(scene)
 
   for entity in scene.entities:
     var intermediate = entity.deepCopy()
@@ -265,6 +290,7 @@ proc draw*(scene: Scene) =
 
     scene.draw(intermediate)
 
+  scene.foreground(scene)
   scene.context.restore()
   scene.context.endFrame()
 
@@ -281,38 +307,16 @@ proc tick(scene: Scene) =
   scene.frameBufferWidth = frameBufferWidth
   scene.pixelRatio = 1
 
-  # By first evaluating all future tweens in reverse order, then old tweens and
-  # finally the current ones, we assure that all tween's have been reset and/or
-  # completed correctly.
-  scene.oldTweens = @[]
-  scene.currentTweens = @[]
-  scene.futureTweens = @[]
+  scene.done = true
 
-  for tween in scene.tweens:
-    if scene.time  > tween.startTime + tween.duration:
-      scene.oldTweens.add(tween)
-    elif scene.time  < tween.startTime:
-      scene.futureTweens.add(tween)
-    else:
-      scene.currentTweens.add(tween)
-
-
-  # when not defined(release):
-    # let progress = (len(scene.oldTweens) + len(scene.currentTweens)) / len(scene.tweens)
-    # stdout.write "\r" & $len(scene.oldTweens) & ":" & $len(scene.currentTweens) & ":" & $len(scene.futureTweens) & " --- " & $(round(progress * 100)) & "%"
-
-  for tween in scene.oldTweens & scene.futureTweens.reversed():
-    tween.evaluate(scene.time)
-
-  for tween in scene.currentTweens:
-    tween.evaluate(scene.time)
+  for track in scene.tweenTracks.values:
+    track.evaluate(scene.time)
+    if not track.done:
+      scene.done = false
 
   scene.draw()
 
   scene.lastTickTime = cpuTime() * 1000
-
-  if len(scene.currentTweens) == 0 and len(scene.futureTweens) == 0:
-    scene.done = true
 
 
 proc update*(scene: Scene) =
@@ -328,7 +332,6 @@ proc update*(scene: Scene) =
 
     if scene.done:
       scene.time = 0
-      scene.done = false
 
   scene.lastUpdateTime = time
 

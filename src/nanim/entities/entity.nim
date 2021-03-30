@@ -29,6 +29,8 @@ type
     rotation*: float
     scaling*: Scale
 
+    children*: seq[Entity]
+
 
 proc `$`*(entity: Entity): string =
   result =
@@ -55,12 +57,13 @@ method draw*(entity: Entity, context: Context) {.base.} =
   context.fill()
 
   context.strokeColor(rgb(230, 26, 94))
-  context.strokeWidth(0)
+  context.strokeWidth(5)
   context.stroke()
 
 
 func init*(entity: Entity) =
   entity.points = @[]
+  entity.children = @[]
   entity.tension = 0.0
   entity.cornerRadius = 20.0
   entity.position = vec3(0.0, 0.0, 0.0)
@@ -72,6 +75,10 @@ func newEntity*(points: seq[Vec3[float]]): Entity =
   new(result)
   result.init()
   result.points = points
+
+
+proc add*(entity: Entity, child: Entity) =
+  entity.children.add(child)
 
 
 func show*(entity: Entity): Tween =
@@ -149,6 +156,9 @@ proc pstretch*(entity: Entity, dx: float = 1.0, dy: float = 1.0, dz: float = 1.0
 
   var interpolators: seq[proc(t: float)]
 
+  for entity in entity.children:
+    interpolators &= entity.pstretch(dx, dy, dz).interpolators
+
   let
     startValue = entity.points.deepCopy()
     endValue = entity.points.map(proc(point: Vec3[float]): Vec3[float] = vec3(point.x * dx, point.y * dy, point.z * dz))
@@ -168,6 +178,21 @@ proc pstretch*(entity: Entity, dx: float = 1.0, dy: float = 1.0, dz: float = 1.0
   result = newTween(interpolators,
                     defaultEasing,
                     defaultDuration)
+
+
+proc pstretch*(entities: varargs[Entity], dx: float = 1.0, dy: float = 1.0, dz: float = 1.0): Tween =
+  var interpolators: seq[proc(t: float)]
+
+  for entity in entities:
+    interpolators &= entity.pstretch(dx, dy, dz).interpolators
+
+  result = newTween(interpolators,
+                    defaultEasing,
+                    defaultDuration)
+
+
+proc pscale*(entities: openArray[Entity], d: float = 1.0): Tween =
+  return entities.pstretch(d, d, d)
 
 
 proc pscale*(entity: Entity, d: float = 1.0): Tween =
