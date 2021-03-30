@@ -1,17 +1,9 @@
 
 import
   unittest,
-  nanim
+  nanim,
+  utils
 
-
-const Tolerance = 1e-8
-
-
-proc `~=`(a, b: float): bool =
-  ## Check if "a" and "b" are close.
-  ## We use a relative tolerance to compare the values.
-
-  result = abs(a - b) <= max(abs(a), abs(b)) * Tolerance
 
 suite "Scene & Entity tests":
   test "Simple Scene with Entity.move()":
@@ -94,3 +86,30 @@ suite "Scene & Entity tests":
 
     discard simpleScene()
 
+
+  test "Value setters":
+    var circle = newCircle()
+    discard circle.setCornerRadius(25.0)
+    check circle.cornerRadius ~= 25.0
+
+    discard circle.setCornerRadius(0.0)
+    check circle.cornerRadius ~= 0.0
+
+
+suite "Interpolations & Easings tests":
+  test "Easings":
+    check linear(0.1) ~= 0.1
+    check linear(1.0) ~= 1.0
+
+    check sigmoid4(0.0) ~= 0.0
+    check sigmoid4(1.0) ~= 1.0
+    check sigmoid4(0.5) ~= 0.5
+
+    check smoothOvershoot(0.0) ~= 0.0
+    check smoothOvershoot(1.0) ~= 1.0
+
+
+  test "Interpolations":
+    check interpolate(0.0, 1.0, 0.5) ~= 0.5
+    check interpolate(100.0, 150.0, 0.5) ~= 125.0
+    check interpolate(-100.0, 100.0, 0.5) ~= 0.0
