@@ -1,6 +1,11 @@
-name: Run nimble test
+name: Unittests
 
-on: push
+on:
+  push:
+    paths:
+    - 'src/**'
+    - 'tests/**'
+    - '.github/**'
 
 jobs:
   nimble-test:
