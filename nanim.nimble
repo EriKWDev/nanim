@@ -1,8 +1,8 @@
 # Package
 
-version       = "0.1.0"
+version       = "0.2.0"
 author        = "EriKWDev"
-description   = "A new awesome nimble package"
+description   = "Nanim is an easy-to-use framework to create smooth GPU-accelerated animations and export them to videos."
 license       = "MIT"
 srcDir        = "src"
 skipDirs      = @["examples"]

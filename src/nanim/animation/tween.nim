@@ -73,7 +73,7 @@ proc init(tween: Tween, interpolators: seq[proc(t: float)], easing: Easing, dura
   tween.startTime = 0
 
 
-func newTween*(interpolators: seq[proc(t: float)], easing: proc(t: float): float, duration: float): Tween =
+func newTween*(interpolators: seq[proc(t: float)], easing: proc(t: float): float = defaultEasing, duration: float = defaultDuration): Tween =
   new(result)
   result.init(interpolators,
               easing,
@@ -100,3 +100,16 @@ proc init(tweenTrack: TweenTrack) =
 func newTweenTrack*(): TweenTrack =
   new(result)
   result.init()
+
+
+template simpleSingleValueTween*(target: typed, startValue: typed, endValue: typed, valueName: untyped) =
+  var interpolators: seq[proc(t: float)]
+
+  let interpolator = proc(t: float) =
+    target.valueName = interpolate(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+
+  target.valueName = endValue
+
+  result = newTween(interpolators)
