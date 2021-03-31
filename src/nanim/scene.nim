@@ -534,103 +534,15 @@ proc renderVideoWithPipe(scene: Scene) =
   doAssert res == 0
 
 
-proc renderVideo(scene: Scene) =
-  let
-    (width, height) = scene.window.size
-    rgbaSize = sizeof(cint)
-    bufferSize: int = width * height * rgbaSize
-    goalFps = 60
-    goalDeltaTime = 1000.0/goalFps.float
-
-  # ? Maybe reset time here. It is probably unexpected through
-  # ? if the scene explicitly has a startHere() call...
-  # scene.time = 0.0
-  scene.deltaTime = goalDeltaTime
-
-  let rendersFolderPath = os.joinPath(os.getAppDir(), "renders")
-
-  createDir(rendersFolderPath)
-  # let ffmpegProcess = startProcess("ffmpeg", "", ffmpegOptions, options = {poUsePath, poEchoCmd})
-  var data = alloc(bufferSize)
-
-  let dataFilePath = os.joinPath(rendersFolderPath, "data.txt")
-  var dataFile = open(dataFilePath, fmReadWrite)
-
-  var i = 0
-  while not scene.window.shouldClose:
-    i = i + 1
-    pollEvents()
-
-    scene.tick()
-    scene.time = scene.time + goalDeltaTime
-
-    glPixelStorei(GL_PACK_ALIGNMENT, 1)
-    glReadBuffer(GL_BACK)
-    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data)
-
-    swapBuffers(scene.window)
-
-    try:
-      if i mod goalFps == 0:
-        dataFile.flushFile()
-
-      let writtenBytes = dataFile.writeBuffer(data, bufferSize)
-      doAssert writtenBytes == bufferSize
-    except:
-      let
-        msg = getCurrentExceptionMsg()
-      echo msg
-      scene.done = true
-
-    if scene.done:
-      scene.window.shouldClose = true
-
-  dealloc(data)
-  scene.window.destroy()
-  dataFile.flushFile()
-  close(dataFile)
-
-  let outputVideoPath = os.joinPath(rendersFolderPath, "scene.mp4")
-
-  # * ffmpeg -y -f rawvideo -pix_fmt rgba -s 1920x1080 -r 60 -i - -vf vflip -an -c:v libx264 -preset fast -crf 18 -tune animation -pix_fmt yuv444p
-  let ffmpegOptions = @[
-    "-y",
-    "-f", "rawvideo",
-    "-pix_fmt", "rgba",
-    "-s", $width & "x" & $height,
-    "-r", $goalFps,
-    "-i", dataFilePath, # * Currently, the temporary data file si used. Would like to get pipes working but startProcess in nim is a bit clunky...
-    "-vf", "vflip", # * Flips the image vertically since glReadPixels gives flipped image
-    "-an",  # * Don't expect audio,
-    # "-loglevel", "panic",
-    "-c:v", "libx264",  # * H.264 encoding
-    "-preset", "fast",  # * Should probably stay at fast/medium later
-    "-crf", "18",  # * Ranges 0-51 indicates lossless compression to worst compression. Sane options are 0-30
-    "-tune", "animation",  # * Tunes the encoder for animation and 'cartoons'
-    "-pix_fmt", "yuv444p", # * Minimal color data loss on H.264 encode
-    outputVideoPath
-  ]
-  # startProcess("ffmpeg", "", ffmpegOptions, options = {poUsePath, poEchoCmd})
-
-  var command = "ffmpeg"
-  for option in ffmpegOptions:
-    command &= " " & option
-
-  echo command
-
-  let res = execShellCmd(command)
-  doAssert res == 0
-
-
 proc render*(userScene: Scene, createVideo: bool = false, width: int = 1920, height: int = 1080) =
   var scene = userScene.deepCopy()
 
   scene.setupRendering(not createVideo, width, height)
 
   if createVideo:
-    when defined(oldRenderer): scene.renderVideo()
-    else: scene.renderVideoWithPipe()
+    scene.renderVideoWithPipe()
   else:
+    # Compensate for the time it took to get here
     scene.time = -cpuTime() * 1000.0
     scene.runLiveRenderingLoop()
 
