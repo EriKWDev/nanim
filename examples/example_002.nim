@@ -61,8 +61,4 @@ proc multiTrackScene(): Scene =
   return scene
 
 
-when isMainModule:
-  when defined(release):
-    render1080p(multiTrackScene)
-  else:
-    render(multiTrackScene)
+when isMainModule: render(multiTrackScene)

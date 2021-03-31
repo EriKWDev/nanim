@@ -329,6 +329,15 @@ proc visualizeTracks(scene: Scene) =
   scene.context.closePath()
   scene.context.fill()
 
+  if scene.restartTime > 0:
+    scene.context.fillColor(rgb(120, 100, 200))
+    scene.context.beginPath()
+    let x = scene.restartTime/endTime * unit
+    scene.context.circle(x, 5, 5)
+    scene.context.rect(x, 5, 2, trackHeight * numberOfTracks.float)
+    scene.context.closePath()
+    scene.context.fill()
+
   scene.context.restore()
 
 
@@ -534,8 +543,64 @@ proc renderVideoWithPipe(scene: Scene) =
   doAssert res == 0
 
 
-proc render*(userScene: Scene, createVideo: bool = false, width: int = 1920, height: int = 1080) =
+import parseopt, strutils
+
+
+proc render*(userScene: Scene) =
   var scene = userScene.deepCopy()
+
+  var
+    width = 1920
+    height = 1080
+    createVideo = false
+
+  for kind, key, value in getOpt():
+    case kind
+    of cmdArgument:
+      discard
+
+    of cmdLongOption, cmdShortOption:
+      case key
+      of "r", "run":
+        createVideo = false
+        break
+      of "v", "video", "render":
+        createVideo = true
+      of "w", "width":
+        width = value.parseInt()
+      of "h", "height":
+        height = value.parseInt()
+      of "1080p", "fullhd":
+        createVideo = true
+        width = 1920
+        height = 1080
+      of "1440p", "2k":
+        createVideo = true
+        width = 2880
+        height = 1440
+      else:
+        echo "Nanim (c) Copyright 2021 Erik Wilhem Gren"
+        echo ""
+        echo "  <filename_containing_scene> [options]"
+        echo ""
+        echo "Options:"
+        echo "  -r, --run"
+        echo "    Opens a window with the scene rendered in realtime."
+        echo "  -v, --video, --render"
+        echo "    Enables video rendering mode. Will output video to renders/final.mp4"
+        echo "  -fullhd, --1080p"
+        echo "    Enables video rendering mode with 1080p settings"
+        echo "  -2k, --1440p"
+        echo "    Enables video rendering mode with 1440p settings"
+        echo "  -4k, --2160p"
+        echo "    Enables video rendering mode with 2160p settings"
+        echo "  -w:WIDTH, --width:WIDTH"
+        echo "    Sets width to WIDTH"
+        echo "  -h:HEIGHT, --height:HEIGHT"
+        echo "    Sets height to HEIGHT"
+        return
+
+    of cmdEnd: discard
 
   scene.setupRendering(not createVideo, width, height)
 
@@ -543,21 +608,14 @@ proc render*(userScene: Scene, createVideo: bool = false, width: int = 1920, hei
     scene.renderVideoWithPipe()
   else:
     # Compensate for the time it took to get here
-    scene.time = -cpuTime() * 1000.0
+    scene.time = scene.time - (cpuTime() * 1000.0)
     scene.runLiveRenderingLoop()
 
   nvgDeleteContext(scene.context)
   terminate()
 
 
-proc render*(userSceneCreator: proc(): Scene, createVideo: bool = false, width: int = 1920, height: int = 1080) =
-  render(userSceneCreator(), createVideo, width, height)
+proc render*(userSceneCreator: proc(): Scene) =
+  render(userSceneCreator())
 
-template createRenderConfig(name: untyped, width: int, height: int) =
-  proc name*(userScene: Scene) = render(userScene, true, width, height)
-  proc name*(userSceneCreator: proc(): Scene) = render(userSceneCreator(), true, width, height)
 
-createRenderConfig(renderFullHD, 1920, 1080)
-createRenderConfig(render1080p, 1920, 1080)
-createRenderConfig(render1440p, 2880, 1440)
-createRenderConfig(render4K, 3840, 2160)

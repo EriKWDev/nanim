@@ -12,6 +12,7 @@ when isMainModule:
   scene.show(circle)
   scene.wait(500)
   scene.play(circle.move(100, 100))
+  scene.startHere()
   scene.wait(500)
 
   render(scene)

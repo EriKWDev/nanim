@@ -65,8 +65,4 @@ proc testScene(): Scene =
   return scene
 
 
-when isMainModule:
-  when defined(release):
-    render1440p(testScene)
-  else:
-    render(testScene)
+when isMainModule: render(testScene)
