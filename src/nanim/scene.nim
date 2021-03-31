@@ -22,12 +22,12 @@ import
   drawing
 
 
-proc createNVGContext(): Context =
+proc createNVGContext(): NVGContext =
   let flags = {nifStencilStrokes, nifDebug}
   return nvgCreateContext(flags)
 
 
-proc loadFonts(context: Context) =
+proc loadFonts(context: NVGContext) =
   let fontFolderPath = os.joinPath(os.getAppDir(), "fonts")
 
   echo "Loading fonts from: " & fontFolderPath
@@ -69,7 +69,7 @@ const DefaultTrackId = 0
 type
   Scene* = ref object of RootObj
     window: Window
-    context*: Context
+    context*: NVGContext
 
     width*: int
     height*: int
@@ -79,7 +79,6 @@ type
 
     time*: float
     restartTime: float
-    lastUpdateTime: float
     lastTickTime: float
     deltaTime: float
 
@@ -98,68 +97,32 @@ type
 
 
 proc pscale*(scene: Scene, d: float = 0): Tween =
-  var interpolators: seq[proc(t: float)]
+  let startValue = scene.projectionMatrix.deepCopy()
 
+  simpleSingleValueTween(scene, startValue, startValue.scale(d), projectionMatrix)
+
+
+proc protate*(scene: Scene, dangle: float = 0, mode: AngleMode = defaultAngleMode): Tween =
   let
     startValue = scene.projectionMatrix.deepCopy()
-    endValue = startValue.scale(vec3(d,d,d))
+    angle = case mode:
+      of amDegrees: degToRad(dangle)
+      of amRadians: dangle
 
-  let interpolator = proc(t: float) =
-    scene.projectionMatrix = interpolate(startValue, endValue, t)
-
-  interpolators.add(interpolator)
-
-  scene.projectionMatrix = endValue
-
-  result = newTween(interpolators,
-                    defaultEasing,
-                    defaultDuration)
-
-
-proc protate*(scene: Scene, angle: float = 0): Tween =
-  var interpolators: seq[proc(t: float)]
-
-  let
-    startValue = scene.projectionMatrix.deepCopy()
-    endValue = startValue.rotateZ(angle)
-
-  let interpolator = proc(t: float) =
-    scene.projectionMatrix = interpolate(startValue, endValue, t)
-
-  interpolators.add(interpolator)
-
-  scene.projectionMatrix = endValue
-
-  result = newTween(interpolators,
-                    defaultEasing,
-                    defaultDuration)
+  simpleSingleValueTween(scene, startValue, startValue.rotateZ(angle), projectionMatrix)
 
 
 proc pmove*(scene: Scene, dx: float = 0, dy: float = 0, dz: float = 0): Tween =
-  var interpolators: seq[proc(t: float)]
+  let startValue = scene.projectionMatrix.deepCopy()
 
-  let
-    startValue = scene.projectionMatrix.deepCopy()
-    endValue = startValue.translate(vec3(dx, dy, dz))
-
-  let interpolator = proc(t: float) =
-    scene.projectionMatrix = interpolate(startValue, endValue, t)
-
-  interpolators.add(interpolator)
-
-  scene.projectionMatrix = endValue
-
-  result = newTween(interpolators,
-                    defaultEasing,
-                    defaultDuration)
+  simpleSingleValueTween(scene, startValue, startValue.translate(vec3(dx, dy, dz)), projectionMatrix)
 
 
 proc newScene*(): Scene =
   new(result)
-  result.time = cpuTime()
+  result.time = 0.0
   result.restartTime = result.time
-  result.lastUpdateTime = -100.0
-  result.lastTickTime = -100.0
+  result.lastTickTime = 0.0
   result.tweenTracks = initTable[int, TweenTrack]()
   result.currentTweenTrackId = DefaultTrackId
 
@@ -184,6 +147,15 @@ proc add*(scene: Scene, entities: varargs[Entity]) =
 
 proc switchTrack*(scene: Scene, newTrackId: int = DefaultTrackId) =
   scene.currentTweenTrackId = newTrackId
+
+
+template onTrack*(scene: Scene, trackId: int = DefaultTrackId, body: untyped): untyped =
+  let oldTrackId = scene.currentTweenTrackId
+  scene.switchTrack(trackId)
+
+  body
+
+  scene.switchTrack(oldTrackId)
 
 
 proc switchToDefaultTrack*(scene: Scene) =
@@ -211,9 +183,7 @@ proc play*(scene: Scene, tweens: varargs[Tween]) =
 
 
 proc wait*(scene: Scene, duration: float = defaultDuration) =
-  scene.animate(newTween(@[],
-                         linear,
-                         duration))
+  scene.animate(newTween(@[], linear, duration))
 
 
 proc syncTracks*(scene: Scene, trackIds: varargs[int]) =
@@ -284,6 +254,7 @@ proc scaleToUnit(scene: Scene, fraction: float = 1000f, compensate: bool = true)
 proc startHere*(scene: Scene) =
   let latestTween = scene.getLatestTween()
   scene.time = latestTween.startTime + latestTween.duration
+  scene.restartTime = scene.time
 
 
 func project(point: Vec3[float], projection: Mat4x4[float]): Vec3[float] =
@@ -413,20 +384,18 @@ proc tick(scene: Scene) =
 
 
 proc update*(scene: Scene) =
-  let time = cpuTime() * 1000
+  let time = cpuTime() * 1000.0
 
   # Try to adhere to a max 120 fps
-  # Since vsync is enabled, this should raarely ever
   let goalDelta = 1000.0/120.0
+
   if time - scene.lastTickTime >= goalDelta:
-    scene.time = scene.time + time - scene.lastTickTime
     scene.deltaTime = time - scene.lastTickTime
+    scene.time = scene.time + scene.deltaTime
     scene.tick()
 
     if scene.done:
-      scene.time = 0
-
-  scene.lastUpdateTime = time
+      scene.time = scene.restartTime
 
 
 proc setupCallbacks(scene: Scene) =
@@ -662,6 +631,7 @@ proc render*(userScene: Scene, createVideo: bool = false, width: int = 1920, hei
     when defined(oldRenderer): scene.renderVideo()
     else: scene.renderVideoWithPipe()
   else:
+    scene.time = -cpuTime() * 1000.0
     scene.runLiveRenderingLoop()
 
   nvgDeleteContext(scene.context)
