@@ -189,6 +189,7 @@ proc add*(scene: Scene, entities: varargs[Entity]) =
 
 proc switchTrack*(scene: Scene, newTrackId: int = DefaultTrackId) =
   scene.currentTweenTrackId = newTrackId
+  discard scene.tweenTracks.hasKeyOrPut(newTrackId, newTweenTrack())
 
 
 template onTrack*(scene: Scene, trackId: int = DefaultTrackId, body: untyped): untyped =
@@ -307,8 +308,6 @@ proc startHere*(scene: Scene, forceUseInReleaseMode: bool = false) =
     let latestTween = scene.getLatestTween()
     scene.time = latestTween.startTime + latestTween.duration
     scene.restartTime = scene.time
-
-
 
 
 func project(point: Vec3[float], projection: Mat4x4[float]): Vec3[float] =

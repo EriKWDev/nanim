@@ -88,16 +88,17 @@ suite "Scene & Entity tests":
     discard simpleScene()
 
 
-  test "Value setters":
+  test "Discarded Tweens Should Still Set Values":
     var circle = newCircle()
     discard circle.setCornerRadius(25.0)
     check circle.cornerRadius ~= 25.0
 
     discard circle.setCornerRadius(0.0)
+
     check circle.cornerRadius ~= 0.0
 
 
-suite "Interpolations & Easings tests":
+suite "Easings":
   test "Easings":
     check linear(0.1) ~= 0.1
     check linear(1.0) ~= 1.0
@@ -109,11 +110,36 @@ suite "Interpolations & Easings tests":
     check smoothOvershoot(0.0) ~= 0.0
     check smoothOvershoot(1.0) ~= 1.0
 
+    let easings = @[linear, sigmoid2, sigmoid3, sigmoid4, sigmoid5, smoothOvershoot, inQuad, outQuad, inExpo, outExpo]
+    for easingFunction in easings:
+      check easingFunction(0.0) ~= 0.0
+      check easingFunction(1.0) ~= 1.0
+
 
   test "Interpolations":
     check interpolate(0.0, 1.0, 0.5) ~= 0.5
     check interpolate(100.0, 150.0, 0.5) ~= 125.0
     check interpolate(-100.0, 100.0, 0.5) ~= 0.0
+
+    var
+      points1 = @[vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0), vec3(0.0, 0.0, 0.0)]
+      points2 = @[vec3(1.0, 1.0, 1.0), vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0)]
+
+      interpolatedPoints00 = interpolate(points1, points2, 0.0)
+      interpolatedPoints05 = interpolate(points1, points2, 0.5)
+      interpolatedPoints10 = interpolate(points1, points2, 1.0)
+
+    check interpolatedPoints00[0] ~= vec3(0.0, 0.0, 0.0)
+    check interpolatedPoints00[1] ~= vec3(1.0, 1.0, 1.0)
+    check interpolatedPoints00[2] ~= vec3(0.0, 0.0, 0.0)
+
+    check interpolatedPoints05[0] ~= vec3(0.5, 0.5, 0.5)
+    check interpolatedPoints05[1] ~= vec3(0.5, 0.5, 0.5)
+    check interpolatedPoints05[2] ~= vec3(0.5, 0.5, 0.5)
+
+    check interpolatedPoints10[0] ~= vec3(1.0, 1.0, 1.0)
+    check interpolatedPoints10[1] ~= vec3(0.0, 0.0, 0.0)
+    check interpolatedPoints10[2] ~= vec3(1.0, 1.0, 1.0)
 
 
   test "Simple Tracks":
@@ -183,3 +209,49 @@ suite "Interpolations & Easings tests":
 
     tween1.evaluate(0)
     check entity.position ~= vec2(100.0, 100.0)
+
+    tween1.execute(1)
+    check entity.position ~= vec2(500.0, 500.0)
+    tween1.execute(0)
+    check entity.position ~= vec2(100.0, 100.0)
+    tween1.execute(1)
+    check entity.position ~= vec2(500.0, 500.0)
+    tween1.execute(0)
+    check entity.position ~= vec2(100.0, 100.0)
+
+
+  test "Track Evaluation":
+    var
+      track = newTweenTrack()
+      entity = newCircle()
+
+    discard entity.moveTo(0, 0)
+    check entity.position ~= vec2(0.0, 0.0)
+
+    let tween1 = entity.move(100, 100)
+    check entity.position ~= vec2(100.0, 100.0)
+    tween1.startTime = 0.0
+    tween1.duration = 1000.0
+    track.add(tween1)
+
+    let tween2 = entity.moveTo(500, 500)
+    check entity.position ~= vec2(500.0, 500.0)
+    tween2.startTime = 1000.0
+    tween2.duration = 1000.0
+    track.add(tween2)
+
+    let tween3 = entity.moveTo(1000, 1000)
+    check entity.position ~= vec2(1000.0, 1000.0)
+    tween3.startTime = 2000.0
+    tween3.duration = 1000.0
+    track.add(tween3)
+
+
+    track.evaluate(0.0)
+    check entity.position ~= vec2(0.0, 0.0)
+    track.evaluate(1000.0)
+    check entity.position ~= vec2(100.0, 100.0)
+    track.evaluate(2000.0)
+    check entity.position ~= vec2(500.0, 500.0)
+    track.evaluate(3000.0)
+    check entity.position ~= vec2(1000.0, 1000.0)
