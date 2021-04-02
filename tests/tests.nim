@@ -138,45 +138,48 @@ suite "Interpolations & Easings tests":
     check scene.getLatestTween().duration ~= 1000.0
 
 
-  test "Simple Tweens":
+  test "Simple Tweens 1":
     var entity = newBestagon()
 
     let
       oldPosition = entity.position
       moveTween1 = entity.move(100, 200)
 
-    check entity.position.x ~= (oldPosition.x + 100.0)
-    check entity.position.y ~= (oldPosition.y + 200.0)
+    check entity.position ~= (oldPosition + vec3(100.0, 200.0, 0.0))
 
     moveTween1.evaluate(0.0)
-
-    check entity.position.x ~= oldPosition.x
-    check entity.position.y ~= oldPosition.y
+    check entity.position ~= oldPosition
 
     moveTween1.evaluate(defaultDuration)
-
-    check entity.position.x ~= (oldPosition.x + 100.0)
-    check entity.position.y ~= (oldPosition.y + 200.0)
+    check entity.position ~= (oldPosition + vec3(100.0, 200.0, 0.0))
 
     let
       moveTween2 = entity.move(100, 100)
       tweenTrack = newTweenTrack()
 
+    check entity.position ~= (oldPosition + vec3(100.0 + 100.0, 200.0 + 100.0, 0.0))
+
     moveTween2.startTime = defaultDuration
     tweenTrack.add(moveTween1, moveTween2)
-    tweenTrack.evaluate(0)
 
-    check entity.position.x ~= oldPosition.x
-    check entity.position.y ~= oldPosition.y
+    tweenTrack.evaluate(0)
+    check entity.position ~= oldPosition
 
     tweenTrack.evaluate(defaultDuration)
-
-    check entity.position.x ~= (oldPosition.x + 100.0)
-    check entity.position.y ~= (oldPosition.y + 200.0)
+    check entity.position ~= (oldPosition + vec3(100.0, 200.0, 0.0))
 
     tweenTrack.evaluate(defaultDuration*2)
-
-    check entity.position.x ~= (oldPosition.x + 100.0 + 100.0)
-    check entity.position.y ~= (oldPosition.y + 200.0 + 100.0)
+    check entity.position ~= (oldPosition + vec3(100.0 + 100.0, 200.0 + 100.0, 0.0))
 
 
+  test "Simple Tweens 2":
+    var entity = newRectangle()
+
+    discard entity.moveTo(100, 100)
+    check entity.position ~= vec2(100.0, 100.0)
+
+    let tween1 = entity.moveTo(500, 500)
+    check entity.position ~= vec2(500.0, 500.0)
+
+    tween1.evaluate(0)
+    check entity.position ~= vec2(100.0, 100.0)

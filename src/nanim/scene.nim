@@ -10,7 +10,9 @@ import
   osproc,
   math,
   streams,
-  tables
+  tables,
+  parseopt,
+  strutils
 
 
 import
@@ -19,7 +21,8 @@ import
   animation/tween,
   animation/easings,
 
-  drawing
+  drawing,
+  logging
 
 
 proc createNVGContext(): NVGContext =
@@ -30,7 +33,7 @@ proc createNVGContext(): NVGContext =
 proc loadFonts(context: NVGContext) =
   let fontFolderPath = os.joinPath(os.getAppDir(), "fonts")
 
-  echo "Loading fonts from: " & fontFolderPath
+  info "Loading fonts from: " & fontFolderPath
 
   let fontNormal = context.createFont("montserrat", os.joinPath(fontFolderPath, "Montserrat-Regular.ttf"))
   doAssert not (fontNormal == NoFont)
@@ -97,25 +100,64 @@ type
 
 
 proc pscale*(scene: Scene, d: float = 0): Tween =
-  let startValue = scene.projectionMatrix.deepCopy()
+  var interpolators: seq[proc(t: float)]
 
-  simpleSingleValueTween(scene, startValue, startValue.scale(d), projectionMatrix)
+  let
+    startValue = scene.projectionMatrix.deepCopy()
+    endValue = startValue.scale(vec3(d,d,d))
+
+  let interpolator = proc(t: float) =
+    scene.projectionMatrix = interpolate(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+
+  scene.projectionMatrix = endValue
+
+  result = newTween(interpolators,
+                    defaultEasing,
+                    defaultDuration)
 
 
 proc protate*(scene: Scene, dangle: float = 0, mode: AngleMode = defaultAngleMode): Tween =
+  var interpolators: seq[proc(t: float)]
+
   let
-    startValue = scene.projectionMatrix.deepCopy()
     angle = case mode:
       of amDegrees: degToRad(dangle)
       of amRadians: dangle
 
-  simpleSingleValueTween(scene, startValue, startValue.rotateZ(angle), projectionMatrix)
+    startValue = scene.projectionMatrix.deepCopy()
+    endValue = startValue.rotateZ(angle)
+
+  let interpolator = proc(t: float) =
+    scene.projectionMatrix = interpolate(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+
+  scene.projectionMatrix = endValue
+
+  result = newTween(interpolators,
+                    defaultEasing,
+                    defaultDuration)
 
 
 proc pmove*(scene: Scene, dx: float = 0, dy: float = 0, dz: float = 0): Tween =
-  let startValue = scene.projectionMatrix.deepCopy()
+  var interpolators: seq[proc(t: float)]
 
-  simpleSingleValueTween(scene, startValue, startValue.translate(vec3(dx, dy, dz)), projectionMatrix)
+  let
+    startValue = scene.projectionMatrix.deepCopy()
+    endValue = startValue.translate(vec3(dx, dy, dz))
+
+  let interpolator = proc(t: float) =
+    scene.projectionMatrix = interpolate(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+
+  scene.projectionMatrix = endValue
+
+  result = newTween(interpolators,
+                    defaultEasing,
+                    defaultDuration)
 
 
 proc newScene*(): Scene =
@@ -142,7 +184,7 @@ func getLatestTween*(scene: Scene): Tween =
 
 
 proc add*(scene: Scene, entities: varargs[Entity]) =
-  scene.entities.add(@entities)
+  scene.entities.add(entities)
 
 
 proc switchTrack*(scene: Scene, newTrackId: int = DefaultTrackId) =
@@ -251,10 +293,22 @@ proc scaleToUnit(scene: Scene, fraction: float = 1000f, compensate: bool = true)
   scene.context.scale(unit, unit)
 
 
-proc startHere*(scene: Scene) =
-  let latestTween = scene.getLatestTween()
-  scene.time = latestTween.startTime + latestTween.duration
-  scene.restartTime = scene.time
+proc startHere*(scene: Scene, forceUseInReleaseMode: bool = false) =
+  when defined(release):
+    if forceUseInReleaseMode:
+      let latestTween = scene.getLatestTween()
+      scene.time = latestTween.startTime + latestTween.duration
+      scene.restartTime = scene.time
+
+  else:
+    if not forceUseInReleaseMode:
+      warn "scene.startHere() utilized. Will be ignored if compiled using '-d:release'. Call scene.startHere(true) if it is intended to be left even in release mode."
+
+    let latestTween = scene.getLatestTween()
+    scene.time = latestTween.startTime + latestTween.duration
+    scene.restartTime = scene.time
+
+
 
 
 func project(point: Vec3[float], projection: Mat4x4[float]): Vec3[float] =
@@ -298,7 +352,7 @@ proc visualizeTracks(scene: Scene) =
   for id, track in scene.tweenTracks.pairs:
     scene.context.fillColor(rgb(100, 100, 200))
     scene.context.textAlign(haLeft, vaMiddle)
-    discard scene.context.text(-80, (i.float + 0.5) * trackHeight, "Track #" & $(id))
+    discard scene.context.text(-80, (i.float + 0.7) * trackHeight, "Track #" & $(id))
 
     for tween in track.tweens:
       scene.context.fillColor(rgb(100, 100, 200))
@@ -321,6 +375,17 @@ proc visualizeTracks(scene: Scene) =
 
     i = i + 1
 
+  if scene.restartTime > 0:
+    let x = scene.restartTime/endTime * unit
+
+    let gradient = scene.context.linearGradient(x, 2.5, x + 200, 2.5, rgb(256, 100, 130), rgba(256, 100, 130, 0))
+
+    scene.context.beginPath()
+    scene.context.roundedRect(x + 2.5, 2.5, 1 * unit, trackHeight * numberOfTracks.float, 10)
+    scene.context.closePath()
+    scene.context.strokePaint(gradient)
+    scene.context.stroke()
+
   scene.context.fillColor(rgb(100, 200, 200))
   scene.context.beginPath()
   let x = scene.time/endTime * unit
@@ -328,15 +393,6 @@ proc visualizeTracks(scene: Scene) =
   scene.context.rect(x, 5, 2, trackHeight * numberOfTracks.float)
   scene.context.closePath()
   scene.context.fill()
-
-  if scene.restartTime > 0:
-    scene.context.fillColor(rgb(120, 100, 200))
-    scene.context.beginPath()
-    let x = scene.restartTime/endTime * unit
-    scene.context.circle(x, 5, 5)
-    scene.context.rect(x, 5, 2, trackHeight * numberOfTracks.float)
-    scene.context.closePath()
-    scene.context.fill()
 
   scene.context.restore()
 
@@ -415,7 +471,8 @@ proc setupCallbacks(scene: Scene) =
     scene.tick()
 
 
-proc setupRendering(scene: var Scene, resizable: bool = true, width: int = 1920, height: int = 1080) =
+proc setupRendering(userScene: Scene, resizable: bool = true, width: int = 1920, height: int = 1080) =
+  var scene = userScene
   initialize()
   scene.window = createWindow(resizable, width, height)
   if resizable: scene.setupCallbacks()
@@ -433,7 +490,7 @@ proc setupRendering(scene: var Scene, resizable: bool = true, width: int = 1920,
 
 
 proc runLiveRenderingLoop(scene: Scene) =
-  # TODO: Make scene.update loop be on a separate thread. That would allow rendering even while user is dragging window...
+  # TODO: Make scene.update loop be on a separate thread. That would allow rendering even while user is dragging/resizing window...
   while not scene.window.shouldClose:
     scene.update()
     swapBuffers(scene.window)
@@ -471,7 +528,7 @@ proc renderVideoWithPipe(scene: Scene) =
     "-an",  # * Don't expect audio,
     # "-loglevel", "panic",
     "-c:v", "libx264",  # * H.264 encoding
-    "-preset", "fast",  # * Should probably stay at fast/medium later
+    "-preset", "medium",  # * Should probably stay at fast/medium later
     "-crf", "18",  # * Ranges 0-51 indicates lossless compression to worst compression. Sane options are 0-30
     "-tune", "animation",  # * Tunes the encoder for animation and 'cartoons'
     "-pix_fmt", "yuv444p" # * Minimal color data loss on H.264 encode
@@ -490,6 +547,7 @@ proc renderVideoWithPipe(scene: Scene) =
     partsFile.writeLine("file '" & partName & "'")
     partsFile.flushFile()
 
+    stdout.write InfoPrefix, "Launching FFMpeg subprocess with "
     startProcess("ffmpeg", "", ffmpegOptions & partName, options = {poUsePath, poEchoCmd})
 
   proc closeFFMpeg() =
@@ -528,22 +586,28 @@ proc renderVideoWithPipe(scene: Scene) =
       writeToFFMpeg(data, bufferSize)
     except:
       let msg = getCurrentExceptionMsg()
-      echo msg
+      error msg
       scene.done = true
 
     if scene.done:
       scene.window.shouldClose = true
 
+  partsFile.flushFile()
   partsFile.close()
   dealloc(data)
   scene.window.destroy()
   closeFFMpeg()
 
-  let res = execShellCmd("ffmpeg -y -f concat -safe 0 -loglevel panic -i " & partsFileName & " -c copy " & os.joinPath(rendersFolderPath, "final.mp4"))
+  # By sleeping just a little bit it seems that the file is really
+  # closed and written. This fixes bugs with extremely short scenes.
+
+  sleep(300)
+  # ffmpeg -y -f concat -safe 0 -i './renders/parts/parts.txt' -c copy final.mp4
+  let command = "ffmpeg -y -f concat -safe 0 -loglevel warning -i " & partsFileName & " -c copy " & os.joinPath(rendersFolderPath, "final.mp4")
+  info "Stitching parts together with ", command
+
+  let res = execShellCmd(command)
   doAssert res == 0
-
-
-import parseopt, strutils
 
 
 proc render*(userScene: Scene) =
