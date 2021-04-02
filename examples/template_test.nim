@@ -9,10 +9,11 @@ when isMainModule:
 
   scene.add(circle)
 
+  scene.wait(500)
   scene.show(circle)
   scene.wait(500)
-  scene.play(circle.move(100, 100))
-  scene.startHere()
+  scene.play(circle.moveTo(600, 600))
+  scene.play(circle.moveTo(500, 500))
   scene.wait(500)
 
   render(scene)

@@ -27,10 +27,18 @@ const defaultDuration*: float = 1100.0
 
 
 proc evaluate*(tween: Tween, time: float) =
-  var t = tween.easing(min(1.0, max(0.0, (time - tween.startTime)/tween.duration)))
+  var t = if tween.duration <= 0:
+      1.0
+    else:
+      tween.easing(min(1.0, max(0.0, (time - tween.startTime)/tween.duration)))
 
-  for i in 0..high(tween.interpolators):
-    tween.interpolators[i](t)
+  for interpolator in tween.interpolators:
+    interpolator(t)
+
+
+proc execute*(tween: Tween, t: float) =
+  for interpolator in tween.interpolators:
+    interpolator(t)
 
 
 proc evaluate*(tweenTrack: TweenTrack, time: float) =
@@ -46,11 +54,13 @@ proc evaluate*(tweenTrack: TweenTrack, time: float) =
       tweenTrack.oldTweens.add(tween)
     elif time < tween.startTime:
       tweenTrack.futureTweens.add(tween)
-
     else:
       tweenTrack.currentTweens.add(tween)
 
-  for tween in tweenTrack.oldTweens & tweenTrack.futureTweens.reversed():
+  for tween in tweenTrack.oldTweens:
+    tween.evaluate(time)
+
+  for tween in tweenTrack.futureTweens.reversed():
     tween.evaluate(time)
 
   for tween in tweenTrack.currentTweens:
@@ -58,7 +68,7 @@ proc evaluate*(tweenTrack: TweenTrack, time: float) =
 
   tweenTrack.done = false
 
-  if len(tweenTrack.oldTweens) == len(tweenTrack.tweens) and len(tweenTrack.futureTweens) == 0:
+  if len(tweenTrack.oldTweens) == len(tweenTrack.tweens) and len(tweenTrack.futureTweens) == 0 and len(tweenTrack.currentTweens) == 0:
     tweenTrack.done = true
 
 
@@ -100,16 +110,3 @@ proc init(tweenTrack: TweenTrack) =
 func newTweenTrack*(): TweenTrack =
   new(result)
   result.init()
-
-
-template simpleSingleValueTween*(target: typed, startValue: typed, endValue: typed, valueName: untyped) =
-  var interpolators: seq[proc(t: float)]
-
-  let interpolator = proc(t: float) =
-    target.valueName = interpolate(startValue, endValue, t)
-
-  interpolators.add(interpolator)
-
-  target.valueName = endValue
-
-  result = newTween(interpolators)

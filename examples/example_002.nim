@@ -32,6 +32,7 @@ proc multiTrackScene(): Scene =
     scene.wait(500)
     scene.play(rectangle.move(-200, -200))
     scene.play(rectangle.rotate(-90))
+    # scene.startHere() # ! start animation here
     for i in 1..5:
         let m = if i mod 2 == 0: -1.0 else: 1.0
         scene.play(rectangle.move(100 * m, -100 * m),
