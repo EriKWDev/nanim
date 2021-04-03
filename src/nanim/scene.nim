@@ -69,6 +69,7 @@ proc createWindow(resizable: bool = true, width: int = 900, height: int = 500): 
 
 const DefaultTrackId = 0
 
+
 type
   Scene* = ref object of RootObj
     window: Window

@@ -88,17 +88,7 @@ suite "Scene & Entity tests":
     discard simpleScene()
 
 
-  test "Discarded Tweens Should Still Set Values":
-    var circle = newCircle()
-    discard circle.setCornerRadius(25.0)
-    check circle.cornerRadius ~= 25.0
-
-    discard circle.setCornerRadius(0.0)
-
-    check circle.cornerRadius ~= 0.0
-
-
-suite "Easings":
+suite "Easings, Tweens and Interpolations":
   test "Easings":
     check linear(0.1) ~= 0.1
     check linear(1.0) ~= 1.0
@@ -162,6 +152,16 @@ suite "Easings":
 
     scene.syncTracks()
     check scene.getLatestTween().duration ~= 1000.0
+
+
+  test "Discarded Tweens Should Still Set Values":
+    var entity = newPentagon()
+    discard entity.setCornerRadius(25.0)
+    check entity.cornerRadius ~= 25.0
+
+    discard entity.setCornerRadius(0.0)
+
+    check entity.cornerRadius ~= 0.0
 
 
   test "Simple Tweens 1":
