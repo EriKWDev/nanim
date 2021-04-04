@@ -3,7 +3,7 @@
 import glm
 
 
-import entity
+import ../core
 
 
 type

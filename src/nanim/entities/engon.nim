@@ -4,7 +4,7 @@ import
   math
 
 
-import entity
+import ../core
 
 
 type

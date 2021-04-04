@@ -85,6 +85,9 @@ proc gridPattern*(context: NVGContext, patternDrawer: proc(context: NVGContext) 
 
   context.endFrame()
 
+  glPixelStorei(GL_PACK_ALIGNMENT, 1)
+  glReadBuffer(GL_BACK)
+
   glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, oldData)
   glDrawPixels(width, height, GL_RGBA, GL_UNSIGNED_BYTE, imageData)
 

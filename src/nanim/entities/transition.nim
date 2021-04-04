@@ -1,5 +1,5 @@
 
-import entity
+import ../core
 
 
 type
