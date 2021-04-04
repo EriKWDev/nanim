@@ -90,6 +90,8 @@ Options:
     Sets height to HEIGHT
 ```
 
+Remember that the rendering to video requires [FFMpeg](https://www.ffmpeg.org/) to be installed and available in your `PATH`.
+
 ### Legal
  - The majority[1] of the source for this project is release under the MIT license. See the `LICENSE` file for details on what this means for distribution.
  - The Montserrat font families used in the examples in the `examples/fonts` directory are used under the OFL and are subject to copyright by The Montserrat Project Authors (https://github.com/JulietaUla/Montserrat). See `examples/fonts/OFL.txt`
