@@ -2,7 +2,7 @@
 import nanovg
 
 
-import entity
+import ../core
 
 
 type

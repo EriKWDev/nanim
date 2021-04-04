@@ -11,23 +11,25 @@
 #                   this package
 #
 
-
 import
   # Animation
   nanim/animation/tween,
   nanim/animation/easings,
 
+  # Core
+  nanim/core,
+
+  # Rendering
+  nanim/rendering,
+
   # Entities
-  nanim/entities/entity,
   nanim/entities/circle,
   nanim/entities/rectangle,
   nanim/entities/text,
-  nanim/entities/engon,
+  nanim/entities/engon
 
-  # Scene
-  nanim/scene
 
-export tween, easings, scene, entity, circle, rectangle, text, engon
+export tween, easings, core, rendering, circle, rectangle, text, engon
 
 # exporting these doesn't make sense in a normal library, but I can't bother importing them in every scene
 import lenientops, glm

@@ -2,3 +2,5 @@
 *.exe
 *.mp4
 *.avi
+
+examples/renders*

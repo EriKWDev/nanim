@@ -1,4 +1,0 @@
-file 'D:\Documents\Coding\GitHub\nanim\examples\renders\parts\scene_0.mp4'
-file 'D:\Documents\Coding\GitHub\nanim\examples\renders\parts\scene_483.mp4'
-file 'D:\Documents\Coding\GitHub\nanim\examples\renders\parts\scene_966.mp4'
-file 'D:\Documents\Coding\GitHub\nanim\examples\renders\parts\scene_1449.mp4'
