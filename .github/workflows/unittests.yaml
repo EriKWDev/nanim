@@ -20,9 +20,17 @@ jobs:
         os:
           - 'ubuntu-latest'
 
-    name: nimble test ${{ matrix.os }} ${{ matrix.nim }}
+    name: Tests on ${{ matrix.os }}, nim ${{ matrix.nim }}
     steps:
       - uses: actions/checkout@v2
+
+      - name: Cache nimble
+        id: cache-nimble
+        uses: actions/cache@v1
+        with:
+          path: ~/.nimble
+          key: ${{ runner.os }}-nimble-${{ hashFiles('*.nimble') }}
+        if: runner.os != 'Windows'
 
       - name: Setup nim
         uses: jiro4989/setup-nim-action@v1
