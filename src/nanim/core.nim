@@ -7,13 +7,11 @@ import
   sequtils,
   os,
   math,
-  times
-
-import
-  animation/tween,
-  animation/easings,
-  drawing,
-  logging
+  times,
+  nanim/animation/tween,
+  nanim/animation/easings,
+  nanim/drawing,
+  nanim/logging
 
 
 type
@@ -76,7 +74,8 @@ proc `$`*(entity: Entity): string =
     "  tension:  " & $(entity.tension)
 
 
-method draw*(entity: Entity, context: NVGContext) {.base.} =
+method draw*(entity: Entity, scene: Scene) {.base.} =
+  let context = scene.context
   context.beginPath()
 
   if entity.tension > 0:
@@ -130,9 +129,7 @@ func show*(entity: Entity): Tween =
 
   entity.position = endValue
 
-  result = newTween(interpolators,
-                    defaultEasing,
-                    defaultDuration)
+  result = newTween(interpolators)
 
 
 func move*(entity: Entity,
@@ -154,9 +151,7 @@ func move*(entity: Entity,
 
   entity.position = endValue
 
-  result = newTween(interpolators,
-                    defaultEasing,
-                    defaultDuration)
+  result = newTween(interpolators)
 
 
 func moveTo*(entity: Entity,
@@ -177,9 +172,7 @@ func moveTo*(entity: Entity,
 
   entity.position = endValue
 
-  result = newTween(interpolators,
-                    defaultEasing,
-                    defaultDuration)
+  result = newTween(interpolators)
 
 
 func stretch*(entity: Entity,
@@ -200,9 +193,7 @@ func stretch*(entity: Entity,
 
   entity.scaling = endValue
 
-  result = newTween(interpolators,
-                    defaultEasing,
-                    defaultDuration)
+  result = newTween(interpolators)
 
 
 func stretchTo*(entity: Entity,
@@ -223,9 +214,7 @@ func stretchTo*(entity: Entity,
 
   entity.scaling = endValue
 
-  result = newTween(interpolators,
-                    defaultEasing,
-                    defaultDuration)
+  result = newTween(interpolators)
 
 
 func scale*(entity: Entity, d: float = 1.0): Tween =
@@ -259,9 +248,7 @@ proc pstretch*(entity: Entity, dx: float = 1.0, dy: float = 1.0, dz: float = 1.0
   entity.points = endValue
   entity.cornerRadius = endCornerRadius
 
-  result = newTween(interpolators,
-                    defaultEasing,
-                    defaultDuration)
+  result = newTween(interpolators)
 
 
 proc pstretch*(entities: varargs[Entity], dx: float = 1.0, dy: float = 1.0, dz: float = 1.0): Tween =
@@ -270,9 +257,7 @@ proc pstretch*(entities: varargs[Entity], dx: float = 1.0, dy: float = 1.0, dz: 
   for entity in entities:
     interpolators &= entity.pstretch(dx, dy, dz).interpolators
 
-  result = newTween(interpolators,
-                    defaultEasing,
-                    defaultDuration)
+  result = newTween(interpolators)
 
 
 proc pscale*(entities: openArray[Entity], d: float = 1.0): Tween =
@@ -301,9 +286,7 @@ func rotate*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngle
 
   entity.rotation = endValue
 
-  result = newTween(interpolators,
-                    defaultEasing,
-                    defaultDuration)
+  result = newTween(interpolators)
 
 
 func rotateTo*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngleMode): Tween =
@@ -324,9 +307,7 @@ func rotateTo*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAng
 
   entity.rotation = endValue
 
-  result = newTween(interpolators,
-                    defaultEasing,
-                    defaultDuration)
+  result = newTween(interpolators)
 
 
 proc setTension*(entity: Entity, tension: float = 0.0): Tween =
@@ -343,7 +324,7 @@ proc setTension*(entity: Entity, tension: float = 0.0): Tween =
 
   entity.tension = endValue
 
-  result = newTween(interpolators, defaultEasing, defaultDuration)
+  result = newTween(interpolators)
 
 
 proc setCornerRadius*(entity: Entity, cornerRadius: float = 0.0): Tween =
@@ -360,12 +341,12 @@ proc setCornerRadius*(entity: Entity, cornerRadius: float = 0.0): Tween =
 
   entity.cornerRadius = endValue
 
-  result = newTween(interpolators, defaultEasing, defaultDuration)
+  result = newTween(interpolators)
 
 
 proc init(scene: Scene) =
   scene.time = 0.0
-  scene.restartTime = scene.time
+  scene.restartTime = 0.0
   scene.lastTickTime = 0.0
   scene.tweenTracks = initTable[int, TweenTrack]()
   scene.currentTweenTrackId = defaultTrackId
@@ -417,9 +398,7 @@ proc pscale*(scene: Scene, d: float = 0): Tween =
 
   scene.projectionMatrix = endValue
 
-  result = newTween(interpolators,
-                    defaultEasing,
-                    defaultDuration)
+  result = newTween(interpolators)
 
 
 proc protate*(scene: Scene, dangle: float = 0, mode: AngleMode = defaultAngleMode): Tween =
@@ -440,9 +419,7 @@ proc protate*(scene: Scene, dangle: float = 0, mode: AngleMode = defaultAngleMod
 
   scene.projectionMatrix = endValue
 
-  result = newTween(interpolators,
-                    defaultEasing,
-                    defaultDuration)
+  result = newTween(interpolators)
 
 
 proc pmove*(scene: Scene, dx: float = 0, dy: float = 0, dz: float = 0): Tween =
@@ -459,9 +436,7 @@ proc pmove*(scene: Scene, dx: float = 0, dy: float = 0, dz: float = 0): Tween =
 
   scene.projectionMatrix = endValue
 
-  result = newTween(interpolators,
-                    defaultEasing,
-                    defaultDuration)
+  result = newTween(interpolators)
 
 
 func getLatestTween*(scene: Scene): Tween =
@@ -612,7 +587,7 @@ proc draw*(scene: Scene, entity: Entity) =
   for child in entity.children:
     scene.draw(child)
 
-  entity.draw(scene.context)
+  entity.draw(scene)
 
   scene.context.restore()
 

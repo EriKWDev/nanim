@@ -1,8 +1,7 @@
 
-import nanovg
-
-
-import ../core
+import
+  nanovg,
+  nanim/core
 
 
 type
@@ -19,7 +18,8 @@ proc init*(text: Text) =
   text.message = ""
 
 
-method draw*(text: Text, context: NVGContext) =
+method draw*(text: Text, scene: Scene) =
+  let context = scene.context
   context.textAlign(text.horizontalAlignment, text.verticalAlignment)
   context.fontSize(text.fontSize * 10)
   context.fontFace(text.font)

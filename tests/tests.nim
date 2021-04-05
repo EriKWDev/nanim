@@ -111,6 +111,14 @@ suite "Easings, Tweens and Interpolations":
     check interpolate(100.0, 150.0, 0.5) ~= 125.0
     check interpolate(-100.0, 100.0, 0.5) ~= 0.0
 
+    check interpolate(1.0, -1.0, 1.0) ~= -1.0
+    check interpolate(-1.0, 1.0, 1.0) ~= 1.0
+
+    check interpolate(false, true, 1.0) == true
+    check interpolate(false, true, 0.2) == false
+    check interpolate(false, true, 0.7) == true
+    check interpolate(false, true, 0.0) == false
+
     var
       points1 = @[vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0), vec3(0.0, 0.0, 0.0)]
       points2 = @[vec3(1.0, 1.0, 1.0), vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0)]

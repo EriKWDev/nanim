@@ -39,11 +39,26 @@ func bounceOut*(t: float): float =
 
 func bounceIn*(t: float): float = return 1.0 - bounceOut(1.0 - t)
 
-# General interpolation
-proc interpolate*[V](fromValue: V,
-                     toValue: V,
-                     t: float): V =
+
+proc interpolate*[V](fromValue: V, toValue: V, t: float): V =
   return fromValue + t * (toValue - fromValue)
+
+proc interpolate*(fromValue: bool, toValue: bool, t: float): bool =
+  return if t < 0.5: fromValue else: toValue
+
+
+# Interpolation of sequence of points
+# TODO: Make sequences of differing size interpolate well too (somehow...)
+proc interpolate*(fromValue: seq[Vec3[float]],
+                  toValue: seq[Vec3[float]],
+                  t: float): seq[Vec3[float]] =
+  var newPoints: seq[Vec3[float]]
+
+  let fromTo = zip(fromValue, toValue)
+  for _, points in fromTo:
+    newPoints.add(interpolate(points[0], points[1], t))
+
+  return newPoints
 
 
 # Can use https://cubic-bezier.com/ to create nice curves
@@ -68,16 +83,3 @@ func smoothOvershoot*(t: float): float = cubicBezier(t, 1.0, -0.3, 0.12, 1.22)
 
 const defaultEasing* = sigmoid3
 
-
-# Interpolation of sequence of points
-# TODO: Make sequences of differing size interpolate well too (somehow...)
-proc interpolate*(fromValue: seq[Vec3[float]],
-                  toValue: seq[Vec3[float]],
-                  t: float): seq[Vec3[float]] =
-  var newPoints: seq[Vec3[float]]
-
-  let fromTo = zip(fromValue, toValue)
-  for _, points in fromTo:
-    newPoints.add(interpolate(points[0], points[1], t))
-
-  return newPoints

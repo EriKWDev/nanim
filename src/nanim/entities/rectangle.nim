@@ -1,9 +1,8 @@
 
 
-import glm
-
-
-import ../core
+import
+  glm,
+  nanim/core
 
 
 type

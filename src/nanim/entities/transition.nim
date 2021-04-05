@@ -1,5 +1,5 @@
 
-import ../core
+import nanim/core
 
 
 type
