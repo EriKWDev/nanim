@@ -1,10 +1,8 @@
 
 import
   glm,
-  math
-
-
-import ../core
+  math,
+  nanim/core
 
 
 type

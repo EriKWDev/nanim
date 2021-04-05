@@ -8,12 +8,9 @@ import
   osproc,
   streams,
   parseopt,
-  strutils
-
-
-import
-  core,
-  logging
+  strutils,
+  nanim/core,
+  nanim/logging
 
 
 proc createNVGContext(): NVGContext =

@@ -1,8 +1,7 @@
 
-import algorithm
-
-
-import easings
+import
+  algorithm,
+  nanim/animation/easings
 
 
 type

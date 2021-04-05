@@ -12,12 +12,11 @@
 #
 
 import
-  # Animation
-  nanim/animation/tween,
-  nanim/animation/easings,
-
   # Core
   nanim/core,
+
+  # Animation
+  nanim/animation,
 
   # Rendering
   nanim/rendering,
@@ -26,10 +25,15 @@ import
   nanim/entities/circle,
   nanim/entities/rectangle,
   nanim/entities/text,
-  nanim/entities/engon
+  nanim/entities/engon,
+  nanim/entities/scene_entity
 
 
-export tween, easings, core, rendering, circle, rectangle, text, engon
+export
+  core,
+  animation,
+  rendering,
+  circle, rectangle, text, engon, scene_entity
 
 # exporting these doesn't make sense in a normal library, but I can't bother importing them in every scene
 import lenientops, glm
