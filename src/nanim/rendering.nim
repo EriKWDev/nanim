@@ -158,6 +158,7 @@ proc renderVideoWithPipe(scene: Scene) =
   proc closeFFMpeg() =
     ffmpegProcess.inputStream().flush()
     ffmpegProcess.close()
+    discard ffmpegProcess.waitForExit()
 
   proc restartFFMPeg(n: int = 0) =
     closeFFMpeg()
