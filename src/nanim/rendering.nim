@@ -29,7 +29,11 @@ proc createWindow(resizable: bool = true, width: int = 900, height: int = 500): 
   config.nMultiSamples = 8
   config.debugContext = true
   config.bits = (r: 8, g: 8, b: 8, a: 8, stencil: 8, depth: 16)
-  config.version = glv30
+
+  when defined(MacOS) or defined(MacOSX):
+    config.version = glv32
+    config.forwardCompat = true
+    config.profile = opCoreProfile
 
   let window = newWindow(config)
   if window == nil: quit(-1)
