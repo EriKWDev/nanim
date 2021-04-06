@@ -18,17 +18,19 @@ type
     amDegrees, amRadians
 
   StyleMode* = enum
-    smSolidColor, smPaintPattern, smNone
+    smSolidColor, smPaintPattern, smBlend, smNone
 
   Style* = ref tuple
     fillMode: StyleMode
     fillColor: Color
     fillPattern: proc(context: NVGContext): Paint
+    fillColorToPatternBlend: float
 
     strokeMode: StyleMode
     strokeColor: Color
     strokePattern: proc(context: NVGContext): Paint
     strokeWidth: float
+    strokeColorToPatternBlend: float
 
     winding: PathWinding
     lineCap: LineCapJoin
@@ -97,32 +99,108 @@ func newStyle*(): Style =
   result.fillMode = smPaintPattern
   result.fillColor = rgb(255, 56, 116)
   result.fillPattern = defaultPattern
+  result.fillColorToPatternBlend = 1.0
 
   result.strokeMode = smSolidColor
   result.strokeColor = rgb(230, 26, 94)
   result.strokePattern = defaultPattern
   result.strokeWidth = 2.0
+  result.strokeColorToPatternBlend = 0.0
 
   result.winding = pwCCW
   result.lineCap = lcjRound
   result.lineJoin = lcjMiter
   result.compositeOperation = coSourceOver
 
+func copyWith*(base: Style,
+               fillMode: StyleMode = base.fillMode,
+               fillColor: Color = base.fillColor,
+               fillPattern = base.fillPattern,
+               fillColorToPatternBlend: float = base.fillColorToPatternBlend,
+               strokeMode: StyleMode = base.strokeMode,
+               strokeColor: Color = base.strokeColor,
+               strokePattern = base.strokePattern,
+               strokeWidth: float = base.strokeWidth,
+               strokeColorToPatternBlend: float = base.strokeColorToPatternBlend,
+               winding = base.winding,
+               lineCap = base.lineCap,
+               lineJoin = base.lineJoin,
+               compositeOperation = base.compositeOperation): Style =
+  new(result)
+  result.fillMode = fillMode
+  result.fillColor = fillColor
+  result.fillPattern = fillPattern
+  result.fillColorToPatternBlend = fillColorToPatternBlend
+
+  result.strokeMode = strokeMode
+  result.strokeColor = strokeColor
+  result.strokePattern = strokePattern
+  result.strokeWidth = strokeWidth
+  result.strokeColorToPatternBlend = strokeColorToPatternBlend
+
+  result.winding = winding
+  result.lineCap = lineCap
+  result.lineJoin = lineJoin
+  result.compositeOperation = compositeOperation
+
+proc apply*(base: Style, style: Style) =
+  base.fillMode = style.fillMode
+  base.fillColor = style.fillColor
+  base.fillPattern = style.fillPattern
+  base.fillColorToPatternBlend = style.fillColorToPatternBlend
+
+  base.strokeMode = style.strokeMode
+  base.strokeColor = style.strokeColor
+  base.strokePattern = style.strokePattern
+  base.strokeWidth = style.strokeWidth
+  base.strokeColorToPatternBlend = style.strokeColorToPatternBlend
+
+  base.winding = style.winding
+  base.lineCap = style.lineCap
+  base.lineJoin = style.lineJoin
+  base.compositeOperation = style.compositeOperation
+
+
+let
+  defaultPaint*: Style = newStyle().copyWith(fillColorToPatternBlend=0.0)
+  bluePaint*: Style = defaultPaint.copyWith(fillColor=rgb(55, 100, 220), strokeColor=rgb(75, 80, 223), strokeWidth=30.0)
+
 
 proc setStyle*(context: NVGContext, style: Style) =
+
+  if style.fillColorToPatternBlend >= 1.0:
+    style.fillMode = smPaintPattern
+  elif style.fillColorToPatternBlend <= 0.0:
+    style.fillMode = smSolidColor
+  else:
+    style.fillMode = smBlend
+
   case style.fillMode:
   of smSolidColor:
     context.fillColor(style.fillColor)
   of smPaintPattern:
     context.fillPaint(style.fillPattern(context))
+  of smBlend:
+    context.fillColor(style.fillColor.withAlpha(1.0 - style.fillColorToPatternBlend))
   of smNone: discard
 
+
+  if style.strokeColorToPatternBlend >= 1.0:
+    style.strokeMode = smPaintPattern
+  elif style.strokeColorToPatternBlend <= 0.0:
+    style.strokeMode = smSolidColor
+  else:
+    style.strokeMode = smBlend
+
   context.strokeWidth(style.strokeWidth)
+
   case style.strokeMode:
   of smSolidColor:
     context.strokeColor(style.strokeColor)
   of smPaintPattern:
     context.strokePaint(style.strokePattern(context))
+  of smBlend:
+    context.strokeColor(style.strokeColor.withAlpha(1.0 - style.strokeColorToPatternBlend))
   of smNone: context.strokeWidth(0.0)
 
   context.pathWinding(style.winding)
@@ -135,10 +213,20 @@ proc executeStyle*(context: NVGContext, style: Style) =
   case style.fillMode:
   of smSolidColor, smPaintPattern:
     context.fill()
+  of smBlend:
+    context.fillPaint(style.fillPattern(context))
+    context.fill()
+    context.fillColor(style.fillColor.withAlpha(1.0 - style.fillColorToPatternBlend))
+    context.fill()
   of smNone: discard
 
   case style.strokeMode:
   of smSolidColor, smPaintPattern:
+    context.stroke()
+  of smBlend:
+    context.fillPaint(style.strokePattern(context))
+    context.stroke()
+    context.fillColor(style.strokeColor.withAlpha(1.0 - style.fillColorToPatternBlend))
     context.stroke()
   of smNone: discard
 
@@ -352,6 +440,76 @@ func rotate*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngle
   interpolators.add(interpolator)
 
   entity.rotation = endValue
+
+  result = newTween(interpolators)
+
+
+func fill*(entity: Entity, fillColor: Color): Tween =
+  var interpolators: seq[proc(t: float)]
+
+  let
+    startValue = entity.style.fillColor.deepCopy()
+    endValue = fillColor
+    startBlend = entity.style.fillColorToPatternBlend.deepCopy()
+
+  let interpolator = proc(t: float) =
+    entity.style.fillColor = interpolate(startValue, endValue, t)
+    entity.style.fillColorToPatternBlend = interpolate(startBlend, 0.0, t)
+
+  interpolators.add(interpolator)
+
+  entity.style.fillColor = endValue
+  entity.style.fillColorToPatternBlend = 0.0
+
+  result = newTween(interpolators)
+
+
+func stroke*(entity: Entity, strokeColor: Color): Tween =
+  var interpolators: seq[proc(t: float)]
+
+  let
+    startValue = entity.style.strokeColor.deepCopy()
+    endValue = strokeColor
+    startBlend = entity.style.strokeColorToPatternBlend.deepCopy()
+
+  let interpolator = proc(t: float) =
+    entity.style.strokeColor = interpolate(startValue, endValue, t)
+    entity.style.strokeColorToPatternBlend = interpolate(startBlend, 0.0, t)
+
+  interpolators.add(interpolator)
+
+  entity.style.strokeColor = endValue
+  entity.style.strokeColorToPatternBlend = 0.0
+
+  result = newTween(interpolators)
+
+
+proc paint*(entity: Entity, style: Style): Tween =
+  var interpolators: seq[proc(t: float)]
+
+  let
+    startStyle = entity.style.deepCopy()
+    endStyle = style.deepCopy()
+
+  let interpolator = proc(t: float) =
+    entity.style.fillColor = interpolate(startStyle.fillColor, endStyle.fillColor, t)
+    entity.style.fillColorToPatternBlend = interpolate(startStyle.fillColorToPatternBlend, endStyle.fillColorToPatternBlend, t)
+    entity.style.fillPattern = eitherOrInterpolation(startStyle.fillPattern, endStyle.fillPattern, t)
+
+    entity.style.strokeColor = interpolate(startStyle.strokeColor, endStyle.strokeColor, t)
+    entity.style.strokeColorToPatternBlend = interpolate(startStyle.strokeColorToPatternBlend, endStyle.strokeColorToPatternBlend, t)
+    entity.style.strokePattern = eitherOrInterpolation(startStyle.strokePattern, endStyle.strokePattern, t)
+    entity.style.strokeWidth = interpolate(startStyle.strokeWidth, endStyle.strokeWidth, t)
+
+  interpolators.add(interpolator)
+
+  # entity.style.fillColor = endStyle.fillColor
+  # entity.style.strokeColor = endStyle.strokeColor
+  # entity.style.fillColorToPatternBlend = endStyle.fillColorToPatternBlend
+  # entity.style.fillPattern = endStyle.fillPattern
+  # entity.style.strokeColorToPatternBlend = endStyle.strokeColorToPatternBlend
+  # entity.style.strokePattern = endStyle.strokePattern
+  entity.style.apply(endStyle)
 
   result = newTween(interpolators)
 

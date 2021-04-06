@@ -80,7 +80,7 @@ proc gridPattern*(context: NVGContext,
                   height: cint = 10): Paint =
 
     # Impure, but worth it for the performance benefit...
-  if hasGatheredPattern and false:
+  if hasGatheredPattern:
     return patternPaint
 
   let
@@ -114,10 +114,14 @@ proc gridPattern*(context: NVGContext,
       ySrc = bufferSize - yDest - lineSize
     copyMem(pixels[yDest].unsafeAddr, imageData.offset(ySrc), lineSize)
 
+  # create an image from pixels
   let image = context.createImageRGBA(width, height, {ifRepeatX, ifRepeatY, ifFlipY}, pixels)
 
+  # create and cache a pattern from the image
   patternPaint = context.imagePattern(0, 0, width.cfloat, height.cfloat, 0, image, 1.0)
   hasGatheredPattern = true
+
+  # return the pattern
   result = patternPaint
 
   dealloc(imageData)

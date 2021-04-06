@@ -3,7 +3,8 @@ import
   unittest,
   nanim,
   tables,
-  utils
+  utils,
+  nanovg
 
 
 suite "Scene & Entity tests":
@@ -118,6 +119,22 @@ suite "Easings, Tweens and Interpolations":
     check interpolate(false, true, 0.2) == false
     check interpolate(false, true, 0.7) == true
     check interpolate(false, true, 0.0) == false
+
+    let
+      fromColor = rgb(0,0,0)
+      toColor = rgb(255,255,255)
+      interpolatedColor00 = interpolate(fromColor, toColor, 0.0)
+      interpolatedColor10 = interpolate(fromColor, toColor, 1.0)
+
+    check interpolatedColor00.r ~= fromColor.r
+    check interpolatedColor00.g ~= fromColor.g
+    check interpolatedColor00.b ~= fromColor.b
+    check interpolatedColor00.a ~= fromColor.a
+
+    check interpolatedColor10.r ~= toColor.r
+    check interpolatedColor10.g ~= toColor.g
+    check interpolatedColor10.b ~= toColor.b
+    check interpolatedColor10.a ~= toColor.a
 
     var
       points1 = @[vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0), vec3(0.0, 0.0, 0.0)]
