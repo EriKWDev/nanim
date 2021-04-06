@@ -5,7 +5,8 @@ import
   # we need it here for the interpolate() proc
   glm,
   math,
-  sequtils
+  sequtils,
+  nanovg
 
 
 type Easing* = proc(t: float): float
@@ -40,11 +41,20 @@ func bounceOut*(t: float): float =
 func bounceIn*(t: float): float = return 1.0 - bounceOut(1.0 - t)
 
 
+proc eitherOrInterpolation*[T](fromValue: T, toValue: T, t: float): T =
+  return if t < 0.5: fromValue else: toValue
+
+
 proc interpolate*[V](fromValue: V, toValue: V, t: float): V =
   return fromValue + t * (toValue - fromValue)
 
+
 proc interpolate*(fromValue: bool, toValue: bool, t: float): bool =
-  return if t < 0.5: fromValue else: toValue
+  eitherOrInterpolation(fromValue, toValue, t)
+
+
+proc interpolate*(fromValue: int, toValue: int, t: float): int =
+  interpolate(fromValue.float, toValue.float, t).int
 
 
 # Interpolation of sequence of points
@@ -59,6 +69,13 @@ proc interpolate*(fromValue: seq[Vec3[float]],
     newPoints.add(interpolate(points[0], points[1], t))
 
   return newPoints
+
+
+proc interpolate*(fromValue: Color, toValue: Color, t: float): Color =
+  lerp(fromValue, toValue, t)
+
+proc interpolate*(fromValue: Paint, toValue: Paint, t: float): Paint =
+  eitherOrInterpolation(fromValue, toValue, t)
 
 
 # Can use https://cubic-bezier.com/ to create nice curves

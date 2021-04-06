@@ -15,11 +15,11 @@ import
   # Core
   nanim/core,
 
-  # Animation
-  nanim/animation,
-
   # Rendering
   nanim/rendering,
+
+  # Animation
+  nanim/animation,
 
   # Entities
   nanim/entities
@@ -27,8 +27,8 @@ import
 
 export
   core,
-  animation,
   rendering,
+  animation,
   entities
 
 # exporting these doesn't make sense in a normal library, but I can't bother importing them in every scene
