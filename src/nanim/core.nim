@@ -8,8 +8,7 @@ import
   os,
   math,
   times,
-  nanim/animation/tween,
-  nanim/animation/easings,
+  nanim/animation,
   nanim/drawing,
   nanim/logging
 
@@ -679,7 +678,10 @@ proc draw*(scene: Scene) =
   scene.visualizeTracks()
 
 
-proc tick*(scene: Scene) =
+proc tick*(scene: Scene, deltaTime: float = 1000.0/120.0) =
+  scene.deltaTime = deltaTime
+  scene.time += scene.deltaTime
+
   scene.done = true
 
   for track in scene.tweenTracks.values:
@@ -699,9 +701,7 @@ proc update*(scene: Scene) =
   let goalDelta = 1000.0/120.0
 
   if time - scene.lastTickTime >= goalDelta:
-    scene.deltaTime = time - scene.lastTickTime
-    scene.time = scene.time + scene.deltaTime
-    scene.tick()
+    scene.tick(time - scene.lastTickTime)
 
     if scene.done:
       scene.time = scene.restartTime

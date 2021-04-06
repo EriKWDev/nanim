@@ -8,6 +8,7 @@ proc extraScene(): Scene =
 
   scene.add(entity)
   scene.play(entity.moveTo(500, 500))
+  scene.wait(500)
 
   return scene
 
