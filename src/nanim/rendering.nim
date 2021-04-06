@@ -109,13 +109,10 @@ proc renderVideoWithPipe(scene: Scene) =
     goalFps = 60
     goalDeltaTime = 1000.0/goalFps.float
 
-  # ? Maybe reset time here. It is probably unexpected through
-  # ? if the scene explicitly has a startHere() call...
-  # scene.time = 0.0
-  scene.deltaTime = goalDeltaTime
+  let
+    rendersFolderPath = os.joinPath(os.getAppDir(), "renders")
+    partsFolderPath = os.joinPath(rendersFolderPath, "parts")
 
-  let rendersFolderPath = os.joinPath(os.getAppDir(), "renders")
-  let partsFolderPath = os.joinPath(rendersFolderPath, "parts")
   createDir(partsFolderPath)
 
   # * ffmpeg -y -f rawvideo -pix_fmt rgba -s 1920x1080 -r 60 -i - -vf vflip -an -c:v libx264 -preset fast -crf 18 -tune animation -pix_fmt yuv444p
@@ -172,8 +169,7 @@ proc renderVideoWithPipe(scene: Scene) =
 
   while not scene.done:
     scene.beginFrame()
-    scene.tick()
-    scene.time = scene.time + goalDeltaTime
+    scene.tick(goalDeltaTime)
     scene.endFrame()
 
     inc i
