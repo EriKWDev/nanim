@@ -17,11 +17,30 @@ type
   AngleMode* = enum
     amDegrees, amRadians
 
+  StyleMode* = enum
+    smSolidColor, smPaintPattern, smNone
+
+  Style* = ref tuple
+    fillMode: StyleMode
+    fillColor: Color
+    fillPattern: proc(context: NVGContext): Paint
+
+    strokeMode: StyleMode
+    strokeColor: Color
+    strokePattern: proc(context: NVGContext): Paint
+    strokeWidth: float
+
+    winding: PathWinding
+    lineCap: LineCapJoin
+    lineJoin: LineCapJoin
+    compositeOperation: CompositeOperation
+
   Entity* = ref object of RootObj
     points*: seq[Vec3[float]]
 
     tension*: float
     cornerRadius*: float
+    style*: Style
 
     position*: Vec3[float]
     rotation*: float
@@ -73,24 +92,72 @@ proc `$`*(entity: Entity): string =
     "  tension:  " & $(entity.tension)
 
 
+func newStyle*(): Style =
+  new(result)
+  result.fillMode = smPaintPattern
+  result.fillColor = rgb(255, 56, 116)
+  result.fillPattern = defaultPattern
+
+  result.strokeMode = smSolidColor
+  result.strokeColor = rgb(230, 26, 94)
+  result.strokePattern = defaultPattern
+  result.strokeWidth = 2.0
+
+  result.winding = pwCCW
+  result.lineCap = lcjRound
+  result.lineJoin = lcjMiter
+  result.compositeOperation = coSourceOver
+
+
+proc setStyle*(context: NVGContext, style: Style) =
+  case style.fillMode:
+  of smSolidColor:
+    context.fillColor(style.fillColor)
+  of smPaintPattern:
+    context.fillPaint(style.fillPattern(context))
+  of smNone: discard
+
+  context.strokeWidth(style.strokeWidth)
+  case style.strokeMode:
+  of smSolidColor:
+    context.strokeColor(style.strokeColor)
+  of smPaintPattern:
+    context.strokePaint(style.strokePattern(context))
+  of smNone: context.strokeWidth(0.0)
+
+  context.pathWinding(style.winding)
+  context.lineJoin(style.lineJoin)
+  context.lineCap(style.lineCap)
+  context.globalCompositeOperation(style.compositeOperation)
+
+
+proc executeStyle*(context: NVGContext, style: Style) =
+  case style.fillMode:
+  of smSolidColor, smPaintPattern:
+    context.fill()
+  of smNone: discard
+
+  case style.strokeMode:
+  of smSolidColor, smPaintPattern:
+    context.stroke()
+  of smNone: discard
+
+
+proc applyStyle*(context: NVGContext, style: Style) =
+  context.setStyle(style)
+  context.executeStyle(style)
+
+
 method draw*(entity: Entity, scene: Scene) {.base.} =
   let context = scene.context
   context.beginPath()
-
   if entity.tension > 0:
     context.drawPointsWithTension(entity.points, entity.tension)
   else:
     context.drawPointsWithRoundedCornerRadius(entity.points, entity.cornerRadius)
-
   context.closePath()
 
-  # context.fillColor(rgb(255, 56, 116))
-  context.fillPaint(context.gridPattern())
-  context.fill()
-
-  context.strokeColor(rgb(230, 26, 94))
-  context.strokeWidth(5)
-  context.stroke()
+  context.applyStyle(entity.style)
 
 
 func init*(entity: Entity) =
@@ -98,6 +165,7 @@ func init*(entity: Entity) =
   entity.children = @[]
   entity.tension = 0.0
   entity.cornerRadius = 20.0
+  entity.style = newStyle()
   entity.position = vec3(0.0, 0.0, 0.0)
   entity.rotation = 0.0
   entity.scaling = vec3(1.0, 1.0, 1.0)
@@ -343,6 +411,17 @@ proc setCornerRadius*(entity: Entity, cornerRadius: float = 0.0): Tween =
   result = newTween(interpolators)
 
 
+proc fill*(context: NVGContext, width: cfloat, height: cfloat, color: Color = rgb(255, 255, 255)) =
+  context.save()
+  context.fillColor(color)
+  context.beginPath()
+  context.resetTransform()
+  context.rect(0, 0, width, height)
+  context.closePath()
+  context.fill()
+  context.restore()
+
+
 proc init(scene: Scene) =
   scene.time = 0.0
   scene.restartTime = 0.0
@@ -356,7 +435,11 @@ proc init(scene: Scene) =
                                           vec4[float](0,0,1,0),
                                           vec4[float](0,0,0,1))
   scene.done = false
-  scene.background = proc(scene: Scene) = clearWithColor(rgb(255, 255, 255))
+
+  scene.background =
+    proc(scene: Scene) =
+      scene.context.fill(scene.width.cfloat, scene.height.cfloat, rgb(255, 255, 255))
+
   scene.foreground = proc(scene: Scene) = discard
 
 

@@ -22,18 +22,14 @@ import
   nanim/rendering,
 
   # Entities
-  nanim/entities/circle,
-  nanim/entities/rectangle,
-  nanim/entities/text,
-  nanim/entities/engon,
-  nanim/entities/scene_entity
+  nanim/entities
 
 
 export
   core,
   animation,
   rendering,
-  circle, rectangle, text, engon, scene_entity
+  entities
 
 # exporting these doesn't make sense in a normal library, but I can't bother importing them in every scene
 import lenientops, glm

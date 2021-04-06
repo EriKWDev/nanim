@@ -16,6 +16,7 @@ type
 proc init*(text: Text) =
   init(text.Entity)
   text.message = ""
+  text.style.fillMode = smSolidColor
 
 
 method draw*(text: Text, scene: Scene) =
@@ -24,17 +25,10 @@ method draw*(text: Text, scene: Scene) =
   context.fontSize(text.fontSize * 10)
   context.fontFace(text.font)
 
+  context.setStyle(text.style)
   context.beginPath()
-
-  context.fillColor(rgb(255, 56, 116))
-
-  context.strokeColor(rgb(230, 26, 94))
-  context.strokeWidth(20)
-
   discard context.text(0, 0, text.message)
   context.closePath()
-  context.stroke()
-  context.fill()
 
 
 proc newText*(message: string = "",

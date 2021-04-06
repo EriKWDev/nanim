@@ -57,58 +57,71 @@ proc drawPointsWithRoundedCornerRadius*(context: NVGContext, points: seq[Vec], c
     context.arcTo(p1.x, p1.y, midPoint.x, midPoint.y, cornerRadius)
 
 
-proc defaultPattern(context: NVGContext) =
+proc defaultPatternDrawer*(context: NVGContext, width: float, height: float) =
   context.beginPath()
-  context.circle(5, 1440-5, 3)
+  context.circle(width/2, height/2, width/2)
   context.closePath()
 
   context.fillColor(rgb(20, 20, 20))
   context.fill()
 
 
+proc offset(some: pointer; b: int): pointer {.inline.} =
+  result = cast[pointer](cast[int](some) + b)
+
+
 var
   patternPaint: Paint
   hasGatheredPattern = false
 
-proc gridPattern*(context: NVGContext, patternDrawer: proc(context: NVGContext) = defaultPattern, width: cint = 10, height: cint = 10): Paint =
-  # Impure, but worth it for the performance benefit...
-  if hasGatheredPattern:
+proc gridPattern*(context: NVGContext,
+                  patternDrawer: proc(context: NVGContext, width: float, height: float) = defaultPatternDrawer,
+                  width: cint = 10,
+                  height: cint = 10): Paint =
+
+    # Impure, but worth it for the performance benefit...
+  if hasGatheredPattern and false:
     return patternPaint
 
   let
-    bufferSize = width*height*4
-    oldTransformMatrix = context.currentTransform()
+    bufferSize = width * height * 4
+    tempContext = nvgCreateContext({nifStencilStrokes, nifDebug})
 
-  var
-    oldData = alloc0(bufferSize)
-    imageData = alloc0(bufferSize)
+  var imageData = alloc0(bufferSize)
 
-  context.endFrame()
-
-  glPixelStorei(GL_PACK_ALIGNMENT, 1)
-  glReadBuffer(GL_BACK)
-
-  glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, oldData)
+  # clear the region
   glDrawPixels(width, height, GL_RGBA, GL_UNSIGNED_BYTE, imageData)
 
-  context.beginFrame(2880.cfloat, 1440.cfloat, 1)
-  patternDrawer(context)
-  context.endFrame()
+  # draw the pattern
+  let (frameBufferWidth, frameBufferHeight) = (2560, 1440)
 
+  tempContext.beginFrame(frameBufferWidth.cfloat, frameBufferHeight.cfloat, 1)
+  clearWithColor()
+  tempContext.translate(0, frameBufferHeight.float - height.float)
+  patternDrawer(tempContext, width.float, height.float)
+  tempContext.endFrame()
+
+  # read the region
   glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, imageData)
-  var pixels: seq[uint8] = newSeq[uint8](bufferSize)
-  copyMem(pixels[0].unsafeAddr, imageData, bufferSize)
+
+  var pixels = newSeq[uint8](bufferSize)
+
+  # Flip the image
+  for y in 0..<height:
+    let
+      lineSize = width * 4
+      yDest = y * lineSize
+      ySrc = bufferSize - yDest - lineSize
+    copyMem(pixels[yDest].unsafeAddr, imageData.offset(ySrc), lineSize)
+
   let image = context.createImageRGBA(width, height, {ifRepeatX, ifRepeatY, ifFlipY}, pixels)
 
   patternPaint = context.imagePattern(0, 0, width.cfloat, height.cfloat, 0, image, 1.0)
   hasGatheredPattern = true
   result = patternPaint
 
-  context.beginFrame(2880.cfloat, 1440.cfloat, 1)
-  glDrawPixels(width, height, GL_RGBA, GL_UNSIGNED_BYTE, oldData)
-
-  dealloc(oldData)
   dealloc(imageData)
 
-  context.transform(oldTransformMatrix.m[0], oldTransformMatrix.m[1], oldTransformMatrix.m[2],
-                    oldTransformMatrix.m[3], oldTransformMatrix.m[4], oldTransformMatrix.m[5])
+
+proc defaultPattern*(context: NVGContext): Paint =
+  context.gridPattern(defaultPatternDrawer, 10, 10)
