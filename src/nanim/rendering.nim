@@ -59,6 +59,8 @@ proc setupRendering(userScene: Scene, resizable: bool = true, width: int = 1920,
   doAssert glInit()
 
   glEnable(GL_MULTISAMPLE)
+  glEnable(GL_BLEND)
+  # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
   makeContextCurrent(scene.window)
 
@@ -247,6 +249,10 @@ proc render*(userScene: Scene) =
         createVideo = true
         width = 2880
         height = 1440
+      of "2560p", "4k":
+        createVideo = true
+        width = 3840
+        height = 2160
       else:
         echo "Nanim (c) Copyright 2021 Erik Wilhem Gren"
         echo ""
@@ -259,9 +265,9 @@ proc render*(userScene: Scene) =
         echo "    Enables video rendering mode. Will output video to renders/final.mp4"
         echo "  -fullhd, --1080p"
         echo "    Enables video rendering mode with 1080p settings"
-        echo "  -2k, --1440p"
+        echo "  --2k, --1440p"
         echo "    Enables video rendering mode with 1440p settings"
-        echo "  -4k, --2160p"
+        echo "  --4k, --2160p"
         echo "    Enables video rendering mode with 2160p settings"
         echo "  -w:WIDTH, --width:WIDTH"
         echo "    Sets width to WIDTH"
