@@ -263,7 +263,7 @@ proc render*(userScene: Scene) =
         echo "    Opens a window with the scene rendered in realtime."
         echo "  -v, --video, --render"
         echo "    Enables video rendering mode. Will output video to renders/final.mp4"
-        echo "  -fullhd, --1080p"
+        echo "  --fullhd, --1080p"
         echo "    Enables video rendering mode with 1080p settings"
         echo "  --2k, --1440p"
         echo "    Enables video rendering mode with 1440p settings"

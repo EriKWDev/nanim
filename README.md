@@ -20,13 +20,13 @@ proc testScene(): Scene =
   var
     text = newText("Hello, World!", font="montserrat-thin")
     rect = newSquare()
-  
+
   # We must add our entities to the scene in order for them to be drawn
   scene.add(rect, text)
 
   # By discarding tweens, we can "set" values without animating the change
   discard text.move(150, 150)
-  
+
   scene.wait(500)
   scene.showAllEntities()
   scene.wait(500)
@@ -49,7 +49,7 @@ proc testScene(): Scene =
 
   scene.wait(500)
   scene.play(rect.move(600), rect.setCornerRadius(30))
-  
+
   # Want to repeat an animation? Simply add a loop!
   for i in 0..5:
     scene.play(rect.move(-20),
@@ -57,7 +57,7 @@ proc testScene(): Scene =
                rect.pscale(if i mod 2 == 0: 1.0/10.0 else: 10.0))
 
   scene.wait(500)
-  
+
   # ..and finally return our scene. Scenes don't have to be created inside a proc/func like
   # this one, but it helps a lot when we want to combine multiple scenes in the future, so
   # it should be considered "best practice".
@@ -78,11 +78,11 @@ Options:
     Opens a window with the scene rendered in realtime.
   -v, --video, --render
     Enables video rendering mode. Will output video to renders/final.mp4
-  -fullhd, --1080p
+  --fullhd, --1080p
     Enables video rendering mode with 1080p settings
-  -2k, --1440p
+  --2k, --1440p
     Enables video rendering mode with 1440p settings
-  -4k, --2160p
+  --4k, --2160p
     Enables video rendering mode with 2160p settings
   -w:WIDTH, --width:WIDTH
     Sets width to WIDTH
