@@ -2,7 +2,9 @@
 import
   nanovg,
   opengl,
-  glm
+  glm,
+  tables,
+  random
 
 
 proc clearWithColor*(color: Color = rgba(0, 0, 0, 0)) =
@@ -59,7 +61,7 @@ proc drawPointsWithRoundedCornerRadius*(context: NVGContext, points: seq[Vec], c
 
 proc defaultPatternDrawer*(context: NVGContext, width: float, height: float) =
   context.beginPath()
-  context.circle(width/2, height/2, width/2)
+  context.circle(width/2, height/2, width/2.2)
   context.closePath()
 
   context.fillColor(rgb(20, 20, 20))
@@ -70,18 +72,18 @@ proc offset(some: pointer; b: int): pointer {.inline.} =
   result = cast[pointer](cast[int](some) + b)
 
 
-var
-  patternPaint: Paint
-  hasGatheredPattern = false
+var patternCache = initTable[proc(context: NVGContext, width: float, height: float): void, seq[Paint]]()
 
 proc gridPattern*(context: NVGContext,
                   patternDrawer: proc(context: NVGContext, width: float, height: float) = defaultPatternDrawer,
                   width: cint = 10,
-                  height: cint = 10): Paint =
+                  height: cint = 10,
+                  cache: bool = true,
+                  numberOfCaches: int = 1): Paint =
 
-    # Impure, but worth it for the performance benefit...
-  if hasGatheredPattern:
-    return patternPaint
+  # Impure, but worth it for the performance benefit...
+  if cache and patternCache.hasKey(patternDrawer) and patternCache[patternDrawer].len >= numberOfCaches:
+    return patternCache[patternDrawer][rand(0..high(patternCache[patternDrawer]))]
 
   let
     bufferSize = width * height * 4
@@ -93,7 +95,7 @@ proc gridPattern*(context: NVGContext,
   glDrawPixels(width, height, GL_RGBA, GL_UNSIGNED_BYTE, imageData)
 
   # draw the pattern
-  let (frameBufferWidth, frameBufferHeight) = (2560, 1440)
+  let (frameBufferWidth, frameBufferHeight) = (1920, 1080)
 
   tempContext.beginFrame(frameBufferWidth.cfloat, frameBufferHeight.cfloat, 1)
   clearWithColor()
@@ -118,8 +120,11 @@ proc gridPattern*(context: NVGContext,
   let image = context.createImageRGBA(width, height, {ifRepeatX, ifRepeatY, ifFlipY}, pixels)
 
   # create and cache a pattern from the image
-  patternPaint = context.imagePattern(0, 0, width.cfloat, height.cfloat, 0, image, 1.0)
-  hasGatheredPattern = true
+  let patternPaint = context.imagePattern(0, 0, width.cfloat, height.cfloat, 0, image, 1.0)
+  if cache:
+    var cacheSeq = patternCache.mgetOrPut(patternDrawer, @[])
+    cacheSeq.add(patternPaint)
+    patternCache[patternDrawer] = cacheSeq
 
   # return the pattern
   result = patternPaint
@@ -127,5 +132,46 @@ proc gridPattern*(context: NVGContext,
   dealloc(imageData)
 
 
+proc randomColor*(greyScale: bool = false): Color =
+  if greyScale:
+    let v = rand(0..255)
+    return rgb(v, v, v)
+  else:
+    let
+      r = rand(0..255)
+      g = rand(0..255)
+      b = rand(0..255)
+
+    return rgb(r, g, b)
+
+
+proc randomNoiseDrawer*(context: NVGContext, width: float, height: float) =
+  let
+    parts = 40.0 * 5
+    pw = width/parts
+    ph = width/parts
+
+  var
+    x = 0.0
+    y = 0.0
+
+  while y < height:
+    while x < width:
+      context.beginPath()
+      context.rect(x, y, pw, ph)
+      context.closePath()
+      context.fillColor(randomColor(true))
+      context.fill()
+
+      x += pw
+    y += ph
+    x = 0.0
+
+
 proc defaultPattern*(context: NVGContext): Paint =
   context.gridPattern(defaultPatternDrawer, 10, 10)
+
+
+proc noisePattern*(context: NVGContext): Paint =
+  context.gridPattern(randomNoiseDrawer, 500, 500, cache = true, 50)
+

@@ -26,10 +26,18 @@ proc colorScene(): Scene =
              bestagon.setTension(0.0))
   scene.wait(500)
   scene.play(bestagon.paint(defaultPaint))
+  scene.startHere(true) # ! scene.startHere()
   scene.wait(500)
   scene.play(bestagon.paint(originalPaint))
-  scene.wait(1000)
-
+  scene.sleep(400)
+  scene.play(bestagon.paint(bluePaint))
+  scene.play(bestagon.paint(noisePaint),
+             bestagon.setTension(0.8))
+  scene.play(bestagon.move(100),
+             bestagon.rotate(180),
+             bestagon.pscale(0.5))
+  scene.sleep(500)
+  scene.play(bestagon.setTension(0.0))
   scene.onTrack(2):
     var rect = newRectangle()
     scene.add(rect)
@@ -38,10 +46,11 @@ proc colorScene(): Scene =
     discard rect.pscale(4)
     scene.play(rect.moveTo(0, 500), rect.rotate(360))
 
-    for i in 0..7:
-      scene.play(rect.move(100, 0), rect.rotate(45))
+    for i in 0..13:
+      scene.play(rect.move(80, 0), rect.rotate(45))
 
   scene.syncTracks()
+  scene.wait(500)
 
   return scene
 

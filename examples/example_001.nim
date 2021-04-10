@@ -17,11 +17,14 @@ proc testScene(): Scene =
   discard text.move(150, 150)
   discard engon1.move(10, 20)
 
-  scene.wait(500)
+  scene.wait(200)
   scene.showAllEntities()
   scene.wait(500)
 
   scene.play(engon1.move(500, 500))
+  scene.play(engon1.fadeTo(0.4))
+  scene.play(engon1.fadeOut())
+  scene.play(engon1.fadeIn())
   scene.play(engon1.setCornerRadius(20), engon1.scale(2))
   scene.play(engon1.setCornerRadius(1))
   scene.play(engon1.setTension(0.4))

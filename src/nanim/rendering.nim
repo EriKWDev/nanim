@@ -60,6 +60,8 @@ proc setupRendering(userScene: Scene, resizable: bool = true, width: int = 1920,
 
   glEnable(GL_MULTISAMPLE)
   glEnable(GL_BLEND)
+  glEnable(GL_STENCIL_TEST)
+  glEnable(GL_BACK)
   # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
   makeContextCurrent(scene.window)
@@ -138,27 +140,29 @@ proc renderVideoWithPipe(scene: Scene) =
   var
     ffmpegProcess: Process
     data = alloc(bufferSize)
+    partNames: seq[string]
 
   let
     partsFileName = os.joinPath(partsFolderPath, "parts.txt")
     partsFile = open(partsFileName, fmWrite)
 
-  proc startFFMpeg(n: int = 0): Process =
+  proc startFFMpeg(n: int = 0) =
     let partName = os.joinPath(partsFolderPath, "scene_" & $n & ".mp4")
+    partNames.add(partName)
     partsFile.writeLine("file '" & partName & "'")
     partsFile.flushFile()
 
-    stdout.write InfoPrefix, "Launching FFMpeg subprocess with "
-    startProcess("ffmpeg", "", ffmpegOptions & partName, options = {poUsePath, poEchoCmd})
+    stdout.write InfoPrefix, "Launching FFMpeg subprocess with: "
+    ffmpegProcess = startProcess("ffmpeg", "", ffmpegOptions & partName, options = {poUsePath, poEchoCmd})
 
   proc closeFFMpeg() =
     ffmpegProcess.inputStream().flush()
     ffmpegProcess.close()
-    discard ffmpegProcess.waitForExit()
+    doAssert ffmpegProcess.waitForExit() == 0
 
   proc restartFFMPeg(n: int = 0) =
     closeFFMpeg()
-    ffmpegProcess = startFFMpeg(n)
+    startFFMpeg(n)
 
   proc writeToFFMpeg(info: pointer, size: int) =
     ffmpegProcess.inputStream().writeData(info, size)
@@ -167,7 +171,7 @@ proc renderVideoWithPipe(scene: Scene) =
     i = 0
     n = 0
 
-  ffmpegProcess = startFFMpeg(i)
+  startFFMpeg(i)
 
   while not scene.done:
     scene.beginFrame()
@@ -184,7 +188,7 @@ proc renderVideoWithPipe(scene: Scene) =
     swapBuffers(scene.window)
 
     try:
-      if bufferSize * n > 4000000000:
+      if bufferSize * n > 700000000:
         restartFFMPeg(i)
         n = 0
 
@@ -208,13 +212,13 @@ proc renderVideoWithPipe(scene: Scene) =
   # By sleeping just a little bit it seems that the file is really
   # closed and written. This fixes bugs with extremely short scenes.
 
-  sleep(300)
+  sleep(500)
+
   # ffmpeg -y -f concat -safe 0 -i './renders/parts/parts.txt' -c copy final.mp4
   let command = "ffmpeg -y -f concat -safe 0 -loglevel warning -i " & partsFileName & " -c copy " & os.joinPath(rendersFolderPath, "final.mp4")
-  info "Stitching parts together with ", command
-
-  let res = execShellCmd(command)
-  doAssert res == 0
+  info "Stitching parts together with: ", command
+  discard execCmd(command)
+  warn "In case the final stitching command failed, you might have to execute the command manually once all ffmpeg-processes have finished. You can check this in task manager (or by listening to your fans xP)."
 
 
 proc render*(userScene: Scene) =
@@ -234,25 +238,32 @@ proc render*(userScene: Scene) =
       case key
       of "r", "run":
         createVideo = false
+        scene.debug = true
         break
       of "v", "video", "render":
         createVideo = true
+        scene.debug = false
       of "w", "width":
         width = value.parseInt()
       of "h", "height":
         height = value.parseInt()
       of "1080p", "fullhd":
         createVideo = true
+        scene.debug = false
         width = 1920
         height = 1080
       of "1440p", "2k":
         createVideo = true
+        scene.debug = false
         width = 2880
         height = 1440
       of "2560p", "4k":
         createVideo = true
+        scene.debug = false
         width = 3840
         height = 2160
+      of "debug":
+        scene.debug = true
       else:
         echo "Nanim (c) Copyright 2021 Erik Wilhem Gren"
         echo ""
@@ -273,6 +284,10 @@ proc render*(userScene: Scene) =
         echo "    Sets width to WIDTH"
         echo "  -h:HEIGHT, --height:HEIGHT"
         echo "    Sets height to HEIGHT"
+        echo "  --debug"
+        echo "    Enables debug mode which will visualize the scene's tracks."
+        echo "    Default behaviour is to show the visualization in live mode"
+        echo "    but not in render mode."
         return
 
     of cmdEnd: discard
