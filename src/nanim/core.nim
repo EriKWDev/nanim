@@ -36,6 +36,7 @@ type
     lineCap: LineCapJoin
     lineJoin: LineCapJoin
     compositeOperation: CompositeOperation
+    opacity: float
 
   Entity* = ref object of RootObj
     points*: seq[Vec3[float]]
@@ -77,6 +78,7 @@ type
     pixelRatio*: float
 
     done*: bool
+    debug*: bool
 
 
 const
@@ -94,23 +96,39 @@ proc `$`*(entity: Entity): string =
     "  tension:  " & $(entity.tension)
 
 
-func newStyle*(): Style =
+func newStyle*(fillMode = smPaintPattern,
+               fillColor = rgb(255, 56, 116),
+               fillPattern = defaultPattern,
+               fillColorToPatternBlend = 1.0,
+
+               strokeMode = smSolidColor,
+               strokeColor = rgb(230, 26, 94),
+               strokePattern = defaultPattern,
+               strokeWidth = 2.0,
+               strokeColorToPatternBlend = 0.0,
+
+               winding = pwCCW,
+               lineCap = lcjRound,
+               lineJoin = lcjMiter,
+               opacity = 1.0,
+               compositeOperation = coSourceOver): Style =
   new(result)
-  result.fillMode = smPaintPattern
-  result.fillColor = rgb(255, 56, 116)
-  result.fillPattern = defaultPattern
-  result.fillColorToPatternBlend = 1.0
+  result.fillMode = fillMode
+  result.fillColor = fillColor
+  result.fillPattern = fillPattern
+  result.fillColorToPatternBlend = fillColorToPatternBlend
 
-  result.strokeMode = smSolidColor
-  result.strokeColor = rgb(230, 26, 94)
-  result.strokePattern = defaultPattern
-  result.strokeWidth = 2.0
-  result.strokeColorToPatternBlend = 0.0
+  result.strokeMode = strokeMode
+  result.strokeColor = strokeColor
+  result.strokePattern = strokePattern
+  result.strokeWidth = strokeWidth
+  result.strokeColorToPatternBlend = strokeColorToPatternBlend
 
-  result.winding = pwCCW
-  result.lineCap = lcjRound
-  result.lineJoin = lcjMiter
-  result.compositeOperation = coSourceOver
+  result.winding = winding
+  result.lineCap = lineCap
+  result.lineJoin = lineJoin
+  result.opacity = opacity
+  result.compositeOperation = compositeOperation
 
 func copyWith*(base: Style,
                fillMode: StyleMode = base.fillMode,
@@ -125,6 +143,7 @@ func copyWith*(base: Style,
                winding = base.winding,
                lineCap = base.lineCap,
                lineJoin = base.lineJoin,
+               opacity = base.opacity,
                compositeOperation = base.compositeOperation): Style =
   new(result)
   result.fillMode = fillMode
@@ -141,6 +160,7 @@ func copyWith*(base: Style,
   result.winding = winding
   result.lineCap = lineCap
   result.lineJoin = lineJoin
+  result.opacity = opacity
   result.compositeOperation = compositeOperation
 
 proc apply*(base: Style, style: Style) =
@@ -158,12 +178,14 @@ proc apply*(base: Style, style: Style) =
   base.winding = style.winding
   base.lineCap = style.lineCap
   base.lineJoin = style.lineJoin
+  base.opacity = style.opacity
   base.compositeOperation = style.compositeOperation
 
 
 let
   defaultPaint*: Style = newStyle().copyWith(fillColorToPatternBlend=0.0)
   bluePaint*: Style = defaultPaint.copyWith(fillColor=rgb(55, 100, 220), strokeColor=rgb(75, 80, 223), strokeWidth=30.0)
+  noisePaint*: Style = defaultPaint.copyWith(fillPattern=noisePattern, fillColorToPatternBlend=1.0)
 
 
 proc setStyle*(context: NVGContext, style: Style) =
@@ -207,6 +229,7 @@ proc setStyle*(context: NVGContext, style: Style) =
   context.lineJoin(style.lineJoin)
   context.lineCap(style.lineCap)
   context.globalCompositeOperation(style.compositeOperation)
+  context.globalAlpha(style.opacity)
 
 
 proc executeStyle*(context: NVGContext, style: Style) =
@@ -276,14 +299,13 @@ func show*(entity: Entity): Tween =
   let
     startValue = entity.position.deepCopy() - delta
     endValue = entity.position.deepCopy()
+    endOpacity = entity.style.opacity.deepCopy()
 
   let interpolator = proc(t: float) =
     entity.position = interpolate(startValue, endValue, t)
+    entity.style.opacity = interpolate(0.0, endOpacity, t)
 
   interpolators.add(interpolator)
-
-  entity.position = endValue
-
   result = newTween(interpolators)
 
 
@@ -494,25 +516,29 @@ proc paint*(entity: Entity, style: Style): Tween =
   let interpolator = proc(t: float) =
     entity.style.fillColor = interpolate(startStyle.fillColor, endStyle.fillColor, t)
     entity.style.fillColorToPatternBlend = interpolate(startStyle.fillColorToPatternBlend, endStyle.fillColorToPatternBlend, t)
-    entity.style.fillPattern = eitherOrInterpolation(startStyle.fillPattern, endStyle.fillPattern, t)
+
+    if startStyle.fillPattern != endStyle.fillPattern:
+      entity.style.fillPattern = endStyle.fillPattern
+    else:
+      entity.style.fillPattern = eitherOrInterpolation(startStyle.fillPattern, endStyle.fillPattern, t)
 
     entity.style.strokeColor = interpolate(startStyle.strokeColor, endStyle.strokeColor, t)
     entity.style.strokeColorToPatternBlend = interpolate(startStyle.strokeColorToPatternBlend, endStyle.strokeColorToPatternBlend, t)
     entity.style.strokePattern = eitherOrInterpolation(startStyle.strokePattern, endStyle.strokePattern, t)
     entity.style.strokeWidth = interpolate(startStyle.strokeWidth, endStyle.strokeWidth, t)
+    entity.style.opacity = interpolate(startStyle.opacity, endStyle.opacity, t)
 
   interpolators.add(interpolator)
-
-  # entity.style.fillColor = endStyle.fillColor
-  # entity.style.strokeColor = endStyle.strokeColor
-  # entity.style.fillColorToPatternBlend = endStyle.fillColorToPatternBlend
-  # entity.style.fillPattern = endStyle.fillPattern
-  # entity.style.strokeColorToPatternBlend = endStyle.strokeColorToPatternBlend
-  # entity.style.strokePattern = endStyle.strokePattern
   entity.style.apply(endStyle)
 
   result = newTween(interpolators)
 
+
+proc fadeTo*(entity: Entity, opacity=1.0): Tween =
+  entity.paint(entity.style.copyWith(opacity=opacity))
+
+proc fadeIn*(entity: Entity): Tween = entity.fadeTo(1.0)
+proc fadeOut*(entity: Entity): Tween = entity.fadeTo(0.0)
 
 func rotateTo*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngleMode): Tween =
   var interpolators: seq[proc(t: float)]
@@ -593,6 +619,7 @@ proc init(scene: Scene) =
                                           vec4[float](0,0,1,0),
                                           vec4[float](0,0,0,1))
   scene.done = false
+  scene.debug = true
 
   scene.background =
     proc(scene: Scene) =
@@ -605,23 +632,26 @@ proc newScene*(): Scene =
   new(result)
   result.init()
 
+proc loadFont*(context: NVGContext, name: string, path: string) =
+  let font = context.createFont(name, path)
+  doAssert not (font == NoFont)
+  info "Loaded font '", path, "' (" & name & ") successfully!"
+
 
 proc loadFonts*(context: NVGContext) =
   let fontFolderPath = os.joinPath(os.getAppDir(), "fonts")
 
+  let fonts = @[
+    ("montserrat", os.joinPath(fontFolderPath, "Montserrat-Regular.ttf")),
+    ("montserrat-thin", os.joinPath(fontFolderPath, "Montserrat-Thin.ttf")),
+    ("montserrat-light", os.joinPath(fontFolderPath, "Montserrat-Light.ttf")),
+    ("montserrat-bold", os.joinPath(fontFolderPath, "Montserrat-Bold.ttf")),
+  ]
+
   info "Loading fonts from: " & fontFolderPath
 
-  let fontNormal = context.createFont("montserrat", os.joinPath(fontFolderPath, "Montserrat-Regular.ttf"))
-  doAssert not (fontNormal == NoFont)
-
-  let fontThin = context.createFont("montserrat-thin", os.joinPath(fontFolderPath, "Montserrat-Thin.ttf"))
-  doAssert not (fontThin == NoFont)
-
-  let fontLight = context.createFont("montserrat-light", os.joinPath(fontFolderPath, "Montserrat-Light.ttf"))
-  doAssert not (fontLight == NoFont)
-
-  let fontBold = context.createFont("montserrat-bold", os.joinPath(fontFolderPath, "Montserrat-Bold.ttf"))
-  doAssert not (fontBold == NoFont)
+  for (name, path) in fonts:
+    context.loadFont(name, path)
 
 
 proc pscale*(scene: Scene, d: float = 0): Tween =
@@ -728,6 +758,9 @@ proc play*(scene: Scene, tweens: varargs[Tween]) =
 
 proc wait*(scene: Scene, duration: float = defaultDuration) =
   scene.animate(newTween(@[], linear, duration))
+
+
+proc sleep*(scene: Scene, duration: float = defaultDuration) = scene.wait(duration)
 
 
 proc show*(scene: Scene, entity: Entity) =
@@ -916,7 +949,9 @@ proc draw*(scene: Scene) =
   scene.foreground(scene)
 
   scene.context.restore()
-  scene.visualizeTracks()
+
+  if scene.debug:
+    scene.visualizeTracks()
 
 
 proc tick*(scene: Scene, deltaTime: float = 1000.0/120.0) =

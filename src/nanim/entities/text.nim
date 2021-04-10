@@ -17,6 +17,7 @@ proc init*(text: Text) =
   init(text.Entity)
   text.message = ""
   text.style.fillMode = smSolidColor
+  text.style.fillColorToPatternBlend = 0.0
 
 
 method draw*(text: Text, scene: Scene) =
