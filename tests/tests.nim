@@ -280,3 +280,49 @@ suite "Easings, Tweens and Interpolations":
     check entity.position ~= vec2(500.0, 500.0)
     track.evaluate(3000.0)
     check entity.position ~= vec2(1000.0, 1000.0)
+
+
+suite "Styles":
+  test "Style Initialization":
+    let style = newStyle(opacity=0.5, strokeWidth=30)
+
+    check style.opacity ~= 0.5
+    check style.strokeWidth ~= 30
+
+  test "Style Copying With Modifications":
+    let style0 = newStyle(opacity=1.0, strokeWidth=10)
+    check style0.strokeWidth ~= 10
+    check style0.opacity ~= 1.0
+
+    let style1 = style0.copyWith(opacity=0.5, strokeWidth=30)
+    check style1.opacity ~= 0.5
+    check style1.strokeWidth ~= 30
+
+    let style2 = style1.copyWith(opacity=1.0)
+    check style2.opacity ~= 1.0
+    check style2.strokeWidth ~= 30
+
+  test "Style Tweens":
+    let style = newStyle(opacity=0.9, strokeWidth=5)
+
+    let entity = newCircle()
+    discard entity.paint(style)
+    check entity.style.opacity ~= 0.9
+
+    discard entity.fadeTo(0.5)
+    check entity.style.opacity ~= 0.5
+    discard entity.fadeIn()
+    check entity.style.opacity ~= 1.0
+
+    let style2 = newStyle(strokeWidth=30)
+
+    check entity.style.strokeWidth ~= 5
+    let style1To2Tween = entity.paint(style2)
+    check entity.style.strokeWidth ~= 30
+
+
+    style1To2Tween.execute(0.0)
+    check entity.style.strokeWidth ~= 5
+    style1To2Tween.execute(1.0)
+    check entity.style.strokeWidth ~= 30
+
