@@ -88,6 +88,10 @@ Options:
     Sets width to WIDTH
   -h:HEIGHT, --height:HEIGHT
     Sets height to HEIGHT
+  --debug
+    Enables debug mode which will visualize the scene's tracks.
+    Default behaviour is to show the visualization in live mode
+    but not in render mode.
 ```
 
 Remember that the rendering to video requires [FFMpeg](https://www.ffmpeg.org/) to be installed and available in your `PATH`.
