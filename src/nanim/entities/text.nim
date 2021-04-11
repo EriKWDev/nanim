@@ -13,11 +13,12 @@ type
     verticalAlignment*: VerticalAlign
 
 
+let defaultTextPaint* = newStyle(fillMode=smSolidColor, fillColor=rgb(255, 255, 255))
+
 proc init*(text: Text) =
   init(text.Entity)
   text.message = ""
-  text.style.fillMode = smSolidColor
-  text.style.fillColorToPatternBlend = 0.0
+  text.style.apply(defaultTextPaint)
 
 
 method draw*(text: Text, scene: Scene) =

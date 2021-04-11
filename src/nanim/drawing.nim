@@ -175,3 +175,7 @@ proc defaultPattern*(context: NVGContext): Paint =
 proc noisePattern*(context: NVGContext): Paint =
   context.gridPattern(randomNoiseDrawer, 500, 500, cache = true, 50)
 
+
+proc gradient*(context: NVGContext, c1: Color = rgb(255, 0, 255), c2: Color = rgb(0, 0, 100)): Paint =
+
+  result = context.linearGradient(0, 0, 100, 100, c1, c2)

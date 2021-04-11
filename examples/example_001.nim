@@ -8,7 +8,7 @@ proc testScene(): Scene =
   var circle1 = newCircle(60)
   var circle2 = newCircle(160)
   var engon1 = newHexagon()
-  var text = newText("Hello, World!", font="montserrat-thin")
+  var text = newText("Hello, World!")
   var rect = newSquare()
 
   scene.add(circle1, circle2, rect, engon1, text)

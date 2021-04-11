@@ -99,13 +99,11 @@ proc `$`*(entity: Entity): string =
 func newStyle*(fillMode = smPaintPattern,
                fillColor = rgb(255, 56, 116),
                fillPattern = defaultPattern,
-               fillColorToPatternBlend = 1.0,
 
                strokeMode = smSolidColor,
                strokeColor = rgb(230, 26, 94),
                strokePattern = defaultPattern,
                strokeWidth = 2.0,
-               strokeColorToPatternBlend = 0.0,
 
                winding = pwCCW,
                lineCap = lcjRound,
@@ -116,13 +114,13 @@ func newStyle*(fillMode = smPaintPattern,
   result.fillMode = fillMode
   result.fillColor = fillColor
   result.fillPattern = fillPattern
-  result.fillColorToPatternBlend = fillColorToPatternBlend
+  result.fillColorToPatternBlend = if fillMode == smSolidColor: 0.0 else: 1.0
 
   result.strokeMode = strokeMode
   result.strokeColor = strokeColor
   result.strokePattern = strokePattern
   result.strokeWidth = strokeWidth
-  result.strokeColorToPatternBlend = strokeColorToPatternBlend
+  result.strokeColorToPatternBlend = if strokeMode == smSolidColor: 0.0 else: 1.0
 
   result.winding = winding
   result.lineCap = lineCap
@@ -183,9 +181,12 @@ proc apply*(base: Style, style: Style) =
 
 
 let
-  defaultPaint*: Style = newStyle().copyWith(fillColorToPatternBlend=0.0)
+  defaultPaint*: Style = newStyle().copyWith(fillMode=smSolidColor)
   bluePaint*: Style = defaultPaint.copyWith(fillColor=rgb(55, 100, 220), strokeColor=rgb(75, 80, 223), strokeWidth=30.0)
-  noisePaint*: Style = defaultPaint.copyWith(fillPattern=noisePattern, fillColorToPatternBlend=1.0)
+  noisePaint*: Style = defaultPaint.copyWith(fillPattern=noisePattern, fillMode=smPaintPattern)
+  gradientPaint*: Style = noisePaint.copyWith(fillPattern =
+                                                proc(context: NVGContext): Paint =
+                                                  gradient(context))
 
 
 proc setStyle*(context: NVGContext, style: Style) =
@@ -623,7 +624,7 @@ proc init(scene: Scene) =
 
   scene.background =
     proc(scene: Scene) =
-      scene.context.fill(scene.width.cfloat, scene.height.cfloat, rgb(255, 255, 255))
+      scene.context.fill(scene.width.cfloat, scene.height.cfloat, rgb(10, 10, 10))
 
   scene.foreground = proc(scene: Scene) = discard
 
@@ -885,7 +886,9 @@ proc visualizeTracks(scene: Scene) =
   for id, track in scene.tweenTracks.pairs:
     scene.context.fillColor(rgb(100, 100, 200))
     scene.context.textAlign(haLeft, vaMiddle)
+    scene.context.globalAlpha(1.0)
     discard scene.context.text(-80, (i.float + 0.7) * trackHeight, "Track #" & $(id))
+    scene.context.globalAlpha(0.3)
 
     for tween in track.tweens:
       scene.context.fillColor(rgb(100, 100, 200))

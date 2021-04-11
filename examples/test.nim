@@ -4,6 +4,11 @@ import nanim, nanovg
 
 proc colorScene(): Scene =
   let scene = newScene()
+  scene.background =
+    proc(s: Scene) =
+      s.context.fill(s.width.float,
+                     s.height.float,
+                     rgb(10, 10, 20))
 
   var bestagon = newBestagon()
 
@@ -20,24 +25,24 @@ proc colorScene(): Scene =
              bestagon.stroke(rgb(25, 250, 190)),
              bestagon.setTension(0.8))
 
-  # scene.startHere() # ! scene.startHere()
   scene.wait(500)
   scene.play(bestagon.paint(bluePaint),
              bestagon.setTension(0.0))
   scene.wait(500)
   scene.play(bestagon.paint(defaultPaint))
-  scene.startHere(true) # ! scene.startHere()
+  # scene.startHere() # ! scene.startHere()
   scene.wait(500)
   scene.play(bestagon.paint(originalPaint))
   scene.sleep(400)
   scene.play(bestagon.paint(bluePaint))
-  scene.play(bestagon.paint(noisePaint),
+  scene.play(bestagon.paint(gradientPaint),
              bestagon.setTension(0.8))
   scene.play(bestagon.move(100),
              bestagon.rotate(180),
              bestagon.pscale(0.5))
   scene.sleep(500)
   scene.play(bestagon.setTension(0.0))
+
   scene.onTrack(2):
     var rect = newRectangle()
     scene.add(rect)
