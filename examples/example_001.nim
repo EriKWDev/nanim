@@ -9,20 +9,25 @@ proc testScene(): Scene =
   var circle2 = newCircle(160)
   var engon1 = newHexagon()
   var text = newText("Hello, World!")
+  var textBox = newTextBox("Lorem ipsum dolor sit amet, conceduar los palmos allit", 1000)
   var rect = newSquare()
 
-  scene.add(circle1, circle2, rect, engon1, text)
+  scene.add(circle1, circle2, rect, engon1, text, textBox)
 
   discard circle1.move(150, 150)
   discard text.move(150, 150)
   discard engon1.move(10, 20)
+  discard textBox.move(500, 700)
 
   scene.wait(200)
   scene.showAllEntities()
   scene.wait(500)
+  scene.play(text.setFontSize(10), textBox.setFontSize(2))
 
   scene.play(engon1.move(500, 500))
   scene.play(engon1.fadeTo(0.4))
+  scene.play(text.fadeOut(), textBox.setFontSize())
+  scene.play(textBox.paint(noisePaint))
   scene.play(engon1.fadeOut())
   scene.play(engon1.fadeIn())
   scene.play(engon1.setCornerRadius(20), engon1.scale(2))
@@ -33,7 +38,7 @@ proc testScene(): Scene =
 
   scene.play(circle1.move(200, 200),
              circle2.move(500, 200),
-             text.move(500, 500),
+             text.moveTo(500, 500),
              rect.move(100, 500),
              rect.rotate(45))
 

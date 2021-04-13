@@ -30,12 +30,10 @@ proc colorScene(): Scene =
              bestagon.setTension(0.0))
   scene.wait(500)
   scene.play(bestagon.paint(defaultPaint))
-  # scene.startHere() # ! scene.startHere()
-  scene.wait(500)
-  scene.play(bestagon.paint(originalPaint))
+  scene.startHere() # ! scene.startHere()
   scene.sleep(400)
   scene.play(bestagon.paint(bluePaint))
-  scene.play(bestagon.paint(gradientPaint),
+  scene.play(bestagon.paint(noisePaint),
              bestagon.setTension(0.8))
   scene.play(bestagon.move(100),
              bestagon.rotate(180),
