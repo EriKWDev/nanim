@@ -1,14 +1,22 @@
 
-import nanim
+import nanim, nanovg
 
 
 proc extraScene(): Scene =
   let scene = newScene()
-  var entity = newRectangle()
+  scene.background =
+    proc(scene: Scene) =
+      scene.fill(rgb(255, 255, 255))
+
+  var entity = newSquare()
+  discard entity.scale(3)
+
+  discard entity.moveTo(0, 500)
 
   scene.add(entity)
+  scene.wait(200)
   scene.play(entity.moveTo(500, 500))
-  scene.wait(500)
+  scene.wait(200)
 
   return scene
 
@@ -16,14 +24,20 @@ proc extraScene(): Scene =
 proc mainScene(): Scene =
   let scene = newScene()
 
-  var subScene1 = newSceneEntity(extraScene)
-  discard subScene1.pause()
-  scene.add(subScene1)
+  for i in 1..10:
+    scene.onTrack i:
+      var subScene1 = newSceneEntity(extraScene, 100, 100)
+      discard subScene1.pause()
+      discard subScene1.moveTo((i - 1) * 100.0, 500)
+      scene.add(subScene1)
 
-  scene.wait(500)
-  scene.play(subScene1.play())
-  scene.wait(1500)
-  scene.play(subScene1.pause())
+      scene.wait(500 + i * 100.0)
+      scene.play(subScene1.play())
+      scene.wait(1500)
+      scene.play(subScene1.pause())
+
+  scene.switchToDefaultTrack()
+  scene.syncTracks()
   scene.wait(500)
 
   return scene

@@ -71,7 +71,7 @@ type
     frameBufferHeight*: int32
 
     currentTweenTrackId*: int
-    tweenTracks*: Table[int, TweenTrack]
+    tweenTracks*: OrderedTable[int, TweenTrack]
 
     entities*: seq[Entity]
     projectionMatrix*: Mat4x4[float]
@@ -95,6 +95,37 @@ proc `$`*(entity: Entity): string =
     "  scale:    " & $(entity.scaling) & "\n" &
     "  rotation: " & $(entity.rotation) & "\n" &
     "  tension:  " & $(entity.tension)
+
+
+proc scaleToUnit(scene: Scene, fraction: float = 1000f, compensate: bool = true) =
+  let n = min(scene.width, scene.height).float
+  let d = max(scene.width, scene.height).float
+
+  let unit = n / fraction
+
+  if compensate:
+    let compensation = (d - n)/2f
+    if scene.width > scene.height:
+      scene.context.translate(compensation, 0f)
+    else:
+      scene.context.translate(0f, compensation)
+
+  scene.context.scale(unit, unit)
+
+
+proc unScaleFromUnit*(scene: Scene, fraction: float = 1000f, compensate: bool = true) =
+  let n = min(scene.width, scene.height).float
+  let d = max(scene.width, scene.height).float
+
+  let unit = n / fraction
+  scene.context.scale(1/unit, 1/unit)
+
+  if compensate:
+    let compensation = (d - n)/2f
+    if scene.width > scene.height:
+      scene.context.translate(-compensation, 0f)
+    else:
+      scene.context.translate(0f, -compensation)
 
 
 proc clearWithColor*(color: Color = rgba(0, 0, 0, 0)) =
@@ -773,35 +804,40 @@ proc setCornerRadius*(entity: Entity, cornerRadius: float = 0.0): Tween =
 
 
 proc fill*(context: NVGContext, width: cfloat, height: cfloat, color: Color = rgb(255, 255, 255)) =
-  context.save()
   context.fillColor(color)
   context.beginPath()
-  context.resetTransform()
   context.rect(0, 0, width, height)
   context.closePath()
   context.fill()
-  context.restore()
+
+
+proc fill*(scene: Scene, color: Color = rgb(255, 255, 255)) =
+  scene.context.save()
+  scene.unScaleFromUnit()
+  scene.context.fillColor(color)
+  scene.context.beginPath()
+  scene.context.rect(0, 0, scene.width.float, scene.height.float)
+  scene.context.closePath()
+  scene.context.fill()
+  scene.context.restore()
 
 
 proc init(scene: Scene) =
   scene.time = 0.0
   scene.restartTime = 0.0
   scene.lastTickTime = 0.0
-  scene.tweenTracks = initTable[int, TweenTrack]()
+  scene.tweenTracks = initOrderedTable[int, TweenTrack]()
   scene.currentTweenTrackId = defaultTrackId
 
   scene.tweenTracks[scene.currentTweenTrackId] = newTweenTrack()
   scene.projectionMatrix = mat4x4[float](vec4[float](1,0,0,0),
-                                          vec4[float](0,1,0,0),
-                                          vec4[float](0,0,1,0),
-                                          vec4[float](0,0,0,1))
+                                         vec4[float](0,1,0,0),
+                                         vec4[float](0,0,1,0),
+                                         vec4[float](0,0,0,1))
   scene.done = false
   scene.debug = true
 
-  scene.background =
-    proc(scene: Scene) =
-      scene.context.fill(scene.width.cfloat, scene.height.cfloat, rgb(10, 10, 10))
-
+  scene.background = proc(scene: Scene) = scene.fill(rgb(10, 10, 10))
   scene.foreground = proc(scene: Scene) = discard
 
 
@@ -989,22 +1025,6 @@ proc syncTracks*(scene: Scene, trackIds: varargs[int]) =
   scene.switchTrack(oldId)
 
 
-proc scaleToUnit(scene: Scene, fraction: float = 1000f, compensate: bool = true) =
-  let n = min(scene.width, scene.height).float
-  let d = max(scene.width, scene.height).float
-
-  let unit = n / fraction
-
-  if compensate:
-    let compensation = (d - n)/2f
-    if scene.width > scene.height:
-      scene.context.translate(compensation, 0f)
-    else:
-      scene.context.translate(0f, compensation)
-
-  scene.context.scale(unit, unit)
-
-
 proc startHere*(scene: Scene, forceUseInReleaseMode: bool = false) =
   when defined(release):
     if forceUseInReleaseMode:
@@ -1086,6 +1106,8 @@ proc visualizeTracks(scene: Scene) =
         scene.context.fill()
 
     i = i + 1
+
+  scene.context.globalAlpha(1.0)
 
   if scene.restartTime > 0:
     let x = scene.restartTime/endTime * unit
