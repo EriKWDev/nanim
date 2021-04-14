@@ -1,7 +1,8 @@
 
 import
   nanim/core,
-  nanim/animation
+  nanim/animation,
+  nanovg
 
 
 type
@@ -27,9 +28,12 @@ proc newSceneEntity*(userScene: Scene, width: int = 1920, height: int = 1080): S
   new(result)
   result.init()
 
-  result.scene = userScene.deepCopy()
+  result.scene = userScene
+  result.scene.debug = false
   result.width = width
   result.height = height
+
+  # discard result.moveTo(-500, 0)
 
 
 proc newSceneEntity*(sceneCreator: proc(): Scene, width: int = 1920, height: int = 1080): SceneEntity =
@@ -42,8 +46,13 @@ method draw*(sceneEntity: SceneEntity, mainScene: Scene) =
 
   sceneEntity.scene.width = sceneEntity.width
   sceneEntity.scene.height = sceneEntity.height
+  sceneEntity.scene.frameBufferWidth = sceneEntity.width.int32
+  sceneEntity.scene.frameBufferHeight = sceneEntity.height.int32
 
   let deltaTime = if sceneEntity.paused: 0.0 else: mainScene.deltaTime
+
+  # TODO: Fix issue https://github.com/EriKWDev/nanim/issues/5
+  # sceneEntity.scene.time = mainScene.time - deltaTime
   sceneEntity.scene.tick(deltaTime)
 
   if sceneEntity.loop and sceneEntity.scene.done:

@@ -6,9 +6,7 @@ proc colorScene(): Scene =
   let scene = newScene()
   scene.background =
     proc(s: Scene) =
-      s.context.fill(s.width.float,
-                     s.height.float,
-                     rgb(10, 10, 20))
+      s.fill(rgb(10, 10, 20))
 
   var bestagon = newBestagon()
 
