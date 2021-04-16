@@ -57,10 +57,10 @@ proc evaluate*(tweenTrack: TweenTrack, time: float) =
       tweenTrack.currentTweens.add(tween)
 
   for tween in tweenTrack.oldTweens:
-    tween.evaluate(time)
+    tween.execute(1.0)
 
   for tween in tweenTrack.futureTweens.reversed():
-    tween.evaluate(time)
+    tween.execute(0.0)
 
   for tween in tweenTrack.currentTweens:
     tween.evaluate(time)
@@ -87,6 +87,24 @@ func newTween*(interpolators: seq[proc(t: float)], easing: proc(t: float): float
   result.init(interpolators,
               easing,
               duration)
+
+
+func with*(base: Tween, duration=base.duration, easing=base.easing, startTime=base.startTime, interpolators=base.interpolators): Tween =
+  new(result)
+  result.duration = duration
+  result.easing = easing
+  result.startTime = startTime
+  result.interpolators = interpolators
+
+
+func copyWith*(base: Tween, duration=base.duration, easing=base.easing, startTime=base.startTime, interpolators=base.interpolators): Tween =
+  with(base, defaultDuration, easing, startTime, interpolators)
+
+
+func with*(bases: openArray[Tween], duration=defaultDuration, easing=defaultEasing): seq[Tween] =
+  result = newSeq[Tween]()
+  for base in bases:
+    result.add(base.with(duration, easing))
 
 
 func getLatestTween*(tweenTrack: TweenTrack): Tween =

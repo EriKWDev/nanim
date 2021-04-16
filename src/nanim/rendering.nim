@@ -188,7 +188,7 @@ proc renderVideoWithPipe(scene: Scene) =
     swapBuffers(scene.window)
 
     try:
-      if bufferSize * n > 700000000:
+      if bufferSize * n > 300000000:
         restartFFMPeg(i)
         n = 0
 
@@ -263,7 +263,7 @@ proc render*(userScene: Scene) =
         width = 3840
         height = 2160
       of "debug":
-        scene.debug = true
+        scene.debug = value.parseBool()
       else:
         echo "Nanim (c) Copyright 2021 Erik Wilhem Gren"
         echo ""
@@ -284,7 +284,7 @@ proc render*(userScene: Scene) =
         echo "    Sets width to WIDTH"
         echo "  -h:HEIGHT, --height:HEIGHT"
         echo "    Sets height to HEIGHT"
-        echo "  --debug"
+        echo "  --debug:true, --debug:false"
         echo "    Enables debug mode which will visualize the scene's tracks."
         echo "    Default behaviour is to show the visualization in live mode"
         echo "    but not in render mode."

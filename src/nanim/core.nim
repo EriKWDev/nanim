@@ -387,7 +387,7 @@ proc apply*(base: Style, style: Style) =
 
 
 let
-  defaultPaint*: Style = newStyle().copyWith(fillMode=smSolidColor)
+  defaultPaint*: Style = newStyle().copyWith(fillMode=smSolidColor, strokeMode=smSolidColor, strokeWidth=0.0)
   bluePaint*: Style = defaultPaint.copyWith(fillColor=rgb(55, 100, 220), strokeColor=rgb(75, 80, 223), strokeWidth=30.0)
   noisePaint*: Style = defaultPaint.copyWith(fillPattern=noisePattern, fillMode=smPaintPattern)
   gradientPaint*: Style = noisePaint.copyWith(fillPattern =
@@ -479,21 +479,66 @@ method draw*(entity: Entity, scene: Scene) {.base.} =
   scene.applyStyle(entity.style)
 
 
-func init*(entity: Entity) =
+proc init*(entity: Entity) =
   entity.points = @[]
   entity.children = @[]
   entity.tension = 0.0
   entity.cornerRadius = 20.0
-  entity.style = newStyle()
+  entity.style = defaultPaint
   entity.position = vec3(0.0, 0.0, 0.0)
   entity.rotation = 0.0
   entity.scaling = vec3(1.0, 1.0, 1.0)
 
 
-func newEntity*(points: seq[Vec3[float]]): Entity =
+proc newEntity*(points: seq[Vec3[float]] = @[]): Entity =
   new(result)
   result.init()
   result.points = points
+
+
+type
+  EntityExtents* = ref tuple
+    width: float
+    height: float
+
+    topLeft: Vec3[float]
+    topRight: Vec3[float]
+    bottomLeft: Vec3[float]
+    bottomRight: Vec3[float]
+
+    center: Vec3[float]
+
+
+func extents*(entity: Entity): EntityExtents =
+  new(result)
+  result.topLeft = vec3[float](0, 0, 0)
+  result.topRight = vec3[float](0, 0, 0)
+  result.bottomLeft = vec3[float](0, 0, 0)
+  result.bottomRight = vec3[float](0, 0, 0)
+  result.center = vec3[float](0, 0, 0)
+
+  for point in entity.points:
+    result.center += point
+
+    if point.x > result.bottomRight.x:
+      result.bottomRight.x = point.x
+      result.topRight.x = point.x
+
+    if point.x < result.bottomLeft.x:
+      result.bottomLeft.x = point.x
+      result.topLeft.x = point.x
+
+    if point.y > result.bottomLeft.y:
+      result.bottomLeft.y = point.y
+      result.bottomRight.y = point.y
+
+    if point.y < result.topLeft.y:
+      result.topLeft.y = point.y
+      result.topRight.y = point.y
+
+  result.center /= len(entity.points).float
+  result.width = result.bottomRight.x - result.bottomLeft.x
+  result.height = result.bottomLeft.y - result.topLeft.y
 
 
 proc add*(entity: Entity, child: Entity) =
@@ -688,28 +733,28 @@ func fill*(entity: Entity, fillColor: Color): Tween =
 
   interpolators.add(interpolator)
 
-  entity.style.fillColor = endValue
-  entity.style.fillColorToPatternBlend = 0.0
+  entity.style = entity.style.copyWith(fillColor=endValue, fillMode=smSolidColor)
 
   result = newTween(interpolators)
 
 
-func stroke*(entity: Entity, strokeColor: Color): Tween =
+func stroke*(entity: Entity, strokeColor: Color, strokeWidth: float = entity.style.strokeWidth): Tween =
   var interpolators: seq[proc(t: float)]
 
   let
     startValue = entity.style.strokeColor.deepCopy()
     endValue = strokeColor
     startBlend = entity.style.strokeColorToPatternBlend.deepCopy()
+    startStrokeWidth = entity.style.strokeWidth.deepCopy()
 
   let interpolator = proc(t: float) =
     entity.style.strokeColor = interpolate(startValue, endValue, t)
     entity.style.strokeColorToPatternBlend = interpolate(startBlend, 0.0, t)
+    entity.style.strokeWidth = interpolate(startStrokeWidth, strokeWidth, t)
 
   interpolators.add(interpolator)
 
-  entity.style.strokeColor = endValue
-  entity.style.strokeColorToPatternBlend = 0.0
+  entity.style = entity.style.copyWith(strokeColor=endValue, strokeMode=smSolidColor, strokeWidth=strokeWidth)
 
   result = newTween(interpolators)
 
@@ -964,9 +1009,7 @@ proc animate*(scene: Scene, tweens: varargs[Tween]) =
   discard scene.tweenTracks.hasKeyOrPut(scene.currentTweenTrackId, newTweenTrack())
   scene.tweenTracks[scene.currentTweenTrackId].add(tweens)
 
-
-proc play*(scene: Scene, tweens: varargs[Tween]) =
-  scene.animate(tweens)
+proc play*(scene: Scene, tweens: varargs[Tween]) = scene.animate(tweens)
 
 
 proc wait*(scene: Scene, duration: float = defaultDuration) =
@@ -1137,18 +1180,20 @@ proc draw*(scene: Scene) =
   scene.background(scene)
 
   for entity in scene.entities:
-    var intermediate = entity.deepCopy()
+    #[var intermediate = entity.deepCopy()
 
     # TODO: Decide what to do with projection of entity.children here...
     # Apply the scene's projection matrix to every point of every entity
     intermediate.points = sequtils.map(intermediate.points,
                                        proc(point: Vec3[float]): Vec3[float] =
-                                         point.project(scene.projectionMatrix))
+                                         point.project(scene.projectionMatrix))]#
 
-    scene.draw(intermediate)
+    if entity.style.opacity <= 0 and len(entity.children) == 0:
+      continue
+
+    scene.draw(entity)
 
   scene.foreground(scene)
-
   scene.context.restore()
 
   if scene.debug:

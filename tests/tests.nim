@@ -101,7 +101,7 @@ suite "Easings, Tweens and Interpolations":
     check smoothOvershoot(0.0) ~= 0.0
     check smoothOvershoot(1.0) ~= 1.0
 
-    let easings = @[linear, sigmoid2, sigmoid3, sigmoid4, sigmoid5, smoothOvershoot, inQuad, outQuad, inExpo, outExpo]
+    let easings = [linear, sigmoid2, sigmoid3, sigmoid4, sigmoid5, smoothOvershoot, inQuad, outQuad, inExpo, outExpo]
     for easingFunction in easings:
       check easingFunction(0.0) ~= 0.0
       check easingFunction(1.0) ~= 1.0
@@ -187,6 +187,20 @@ suite "Easings, Tweens and Interpolations":
     discard entity.setCornerRadius(0.0)
 
     check entity.cornerRadius ~= 0.0
+
+
+  test "Tween Options":
+    var circle = newCircle()
+    let tweens = [circle.moveTo(0, 0), circle.scale(10)].with(duration=100.0)
+    for tween in tweens:
+      check tween.duration ~= 100.0
+
+    let easings = [linear, bounceIn, smoothOvershoot, outQuad]
+
+    for easing in easings:
+      let moveTween = circle.moveTo(100.0, 0).with(easing=easing)
+      check moveTween.easing == easing
+
 
 
   test "Simple Tweens 1":
@@ -326,3 +340,17 @@ suite "Styles":
     style1To2Tween.execute(1.0)
     check entity.style.strokeWidth ~= 30
 
+
+suite "Other":
+  test "Entity Extents":
+    let
+      square = newSquare(10)
+      entityExtents = extents(square)
+
+    check entityExtents.topLeft ~= vec2[float](-5, -5)
+    check entityExtents.topRight ~= vec2[float](5, -5)
+    check entityExtents.bottomLeft ~= vec2[float](-5, 5)
+    check entityExtents.bottomRight ~= vec2[float](5, 5)
+
+    check entityExtents.height ~= 10
+    check entityExtents.width ~= 10
