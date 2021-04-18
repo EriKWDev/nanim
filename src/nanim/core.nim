@@ -397,12 +397,14 @@ let
 
 proc setStyle*(scene: Scene, style: Style) =
   let context = scene.context
-  if style.fillColorToPatternBlend >= 1.0:
-    style.fillMode = smPaintPattern
-  elif style.fillColorToPatternBlend <= 0.0:
-    style.fillMode = smSolidColor
-  else:
-    style.fillMode = smBlend
+
+  if style.fillMode != smNone:
+    if style.fillColorToPatternBlend >= 1.0:
+      style.fillMode = smPaintPattern
+    elif style.fillColorToPatternBlend <= 0.0:
+      style.fillMode = smSolidColor
+    else:
+      style.fillMode = smBlend
 
   case style.fillMode:
   of smSolidColor:
@@ -413,15 +415,15 @@ proc setStyle*(scene: Scene, style: Style) =
     context.fillColor(style.fillColor.withAlpha(1.0 - style.fillColorToPatternBlend))
   of smNone: discard
 
+  if style.strokeMode != smNone:
+    if style.strokeColorToPatternBlend >= 1.0:
+      style.strokeMode = smPaintPattern
+    elif style.strokeColorToPatternBlend <= 0.0:
+      style.strokeMode = smSolidColor
+    else:
+      style.strokeMode = smBlend
 
-  if style.strokeColorToPatternBlend >= 1.0:
-    style.strokeMode = smPaintPattern
-  elif style.strokeColorToPatternBlend <= 0.0:
-    style.strokeMode = smSolidColor
-  else:
-    style.strokeMode = smBlend
-
-  context.strokeWidth(style.strokeWidth)
+    context.strokeWidth(abs(style.strokeWidth))
 
   case style.strokeMode:
   of smSolidColor:
@@ -545,7 +547,7 @@ proc add*(entity: Entity, child: Entity) =
   entity.children.add(child)
 
 
-func show*(entity: Entity): Tween =
+proc show*(entity: Entity): Tween =
   var interpolators: seq[proc(t: float)]
   let delta = vec3(10.0, 0.0, 0.0)
 
@@ -562,7 +564,7 @@ func show*(entity: Entity): Tween =
   result = newTween(interpolators)
 
 
-func move*(entity: Entity,
+proc move*(entity: Entity,
            dx: float = 0.0,
            dy: float = 0.0,
            dz: float = 0.0): Tween =
@@ -584,7 +586,7 @@ func move*(entity: Entity,
   result = newTween(interpolators)
 
 
-func moveTo*(entity: Entity,
+proc moveTo*(entity: Entity,
            dx: float = 0.0,
            dy: float = 0.0,
            dz: float = 0.0): Tween =
@@ -605,7 +607,7 @@ func moveTo*(entity: Entity,
   result = newTween(interpolators)
 
 
-func stretch*(entity: Entity,
+proc stretch*(entity: Entity,
               dx: float = 1.0,
               dy: float = 1.0,
               dz: float = 1.0): Tween =
@@ -626,7 +628,7 @@ func stretch*(entity: Entity,
   result = newTween(interpolators)
 
 
-func stretchTo*(entity: Entity,
+proc stretchTo*(entity: Entity,
               dx: float = 1.0,
               dy: float = 1.0,
               dz: float = 1.0): Tween =
@@ -647,11 +649,11 @@ func stretchTo*(entity: Entity,
   result = newTween(interpolators)
 
 
-func scale*(entity: Entity, d: float = 1.0): Tween =
+proc scale*(entity: Entity, d: float = 1.0): Tween =
   return entity.stretch(d, d, d)
 
 
-func scaleTo*(entity: Entity, d: float = 1.0): Tween =
+proc scaleTo*(entity: Entity, d: float = 1.0): Tween =
   return entity.stretchTo(d, d, d)
 
 
@@ -698,7 +700,7 @@ proc pscale*(entity: Entity, d: float = 1.0): Tween =
   return entity.pstretch(d, d, d)
 
 
-func rotate*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngleMode): Tween =
+proc rotate*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngleMode): Tween =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -719,7 +721,7 @@ func rotate*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngle
   result = newTween(interpolators)
 
 
-func fill*(entity: Entity, fillColor: Color): Tween =
+proc fill*(entity: Entity, fillColor: Color): Tween =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -738,7 +740,7 @@ func fill*(entity: Entity, fillColor: Color): Tween =
   result = newTween(interpolators)
 
 
-func stroke*(entity: Entity, strokeColor: Color, strokeWidth: float = entity.style.strokeWidth): Tween =
+proc stroke*(entity: Entity, strokeColor: Color, strokeWidth: float = entity.style.strokeWidth): Tween =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -793,7 +795,7 @@ proc fadeTo*(entity: Entity, opacity=1.0): Tween =
 proc fadeIn*(entity: Entity): Tween = entity.fadeTo(1.0)
 proc fadeOut*(entity: Entity): Tween = entity.fadeTo(0.0)
 
-func rotateTo*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngleMode): Tween =
+proc rotateTo*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngleMode): Tween =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -994,23 +996,38 @@ proc switchToDefaultTrack*(scene: Scene) =
   scene.switchTrack(defaultTrackId)
 
 
-proc animate*(scene: Scene, tweens: varargs[Tween]) =
-  var previousEndtime: float
 
+proc getPreviousEndTime*(scene: Scene): float =
   try:
     let previousTween = scene.getLatestTween()
-    previousEndTime = previousTween.startTime + previousTween.duration
+    result = previousTween.startTime + previousTween.duration
   except IndexDefect:
-    previousEndTime = 0.0
+    result = 0.0
+
+
+proc addTweens*(scene: Scene, tweens: varargs[Tween]) =
+  discard scene.tweenTracks.hasKeyOrPut(scene.currentTweenTrackId, newTweenTrack())
+  scene.tweenTracks[scene.currentTweenTrackId].add(tweens)
+
+
+proc animate*(scene: Scene, tweens: varargs[Tween]) =
+  let previousEndtime = scene.getPreviousEndTime()
 
   for tween in tweens:
     tween.startTime = previousEndTime
 
-  discard scene.tweenTracks.hasKeyOrPut(scene.currentTweenTrackId, newTweenTrack())
-  scene.tweenTracks[scene.currentTweenTrackId].add(tweens)
+  scene.addTweens(tweens)
 
 proc play*(scene: Scene, tweens: varargs[Tween]) = scene.animate(tweens)
 
+proc stagger*(scene: Scene, staggering: float, duration: float, tweens: varargs[Tween]) =
+  let previousEndtime = scene.getPreviousEndTime()
+
+  for i, tween in tweens:
+    tween.startTime = previousEndTime + i.float * staggering
+    tween.duration = duration
+
+  scene.addTweens(tweens)
 
 proc wait*(scene: Scene, duration: float = defaultDuration) =
   scene.animate(newTween(@[], linear, duration))
