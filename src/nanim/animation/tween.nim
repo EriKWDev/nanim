@@ -22,7 +22,7 @@ type
     done*: bool
 
 
-const defaultDuration*: float = 1100.0
+var defaultDuration*: float = 1100.0
 
 
 proc evaluate*(tween: Tween, time: float) =
@@ -82,14 +82,14 @@ proc init(tween: Tween, interpolators: seq[proc(t: float)], easing: Easing, dura
   tween.startTime = 0
 
 
-func newTween*(interpolators: seq[proc(t: float)], easing: proc(t: float): float = defaultEasing, duration: float = defaultDuration): Tween =
+proc newTween*(interpolators: seq[proc(t: float)], easing: proc(t: float): float = defaultEasing, duration: float = defaultDuration): Tween =
   new(result)
   result.init(interpolators,
               easing,
               duration)
 
 
-func with*(base: Tween, duration=base.duration, easing=base.easing, startTime=base.startTime, interpolators=base.interpolators): Tween =
+proc with*(base: Tween, duration=base.duration, easing=base.easing, startTime=base.startTime, interpolators=base.interpolators): Tween =
   new(result)
   result.duration = duration
   result.easing = easing
@@ -97,7 +97,7 @@ func with*(base: Tween, duration=base.duration, easing=base.easing, startTime=ba
   result.interpolators = interpolators
 
 
-func copyWith*(base: Tween, duration=base.duration, easing=base.easing, startTime=base.startTime, interpolators=base.interpolators): Tween =
+proc copyWith*(base: Tween, duration=base.duration, easing=base.easing, startTime=base.startTime, interpolators=base.interpolators): Tween =
   with(base, defaultDuration, easing, startTime, interpolators)
 
 

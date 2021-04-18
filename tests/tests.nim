@@ -89,6 +89,33 @@ suite "Scene & Entity tests":
     discard simpleScene()
 
 
+  test "Scene Stagger":
+    let scene = newScene()
+
+    var
+      t1 = newTween(@[], linear, 1000.0)
+      t2 = newTween(@[], linear, 1000.0)
+      t3 = newTween(@[], linear, 1000.0)
+      t4 = newTween(@[], linear, 1000.0)
+      t5 = newTween(@[], linear, 1000.0)
+
+    let
+      tweens = [t1, t2, t3, t4, t5]
+      staggering = 200.0
+      duration = 2000.0
+
+    scene.stagger(staggering, duration, tweens)
+
+    var last = 0.0
+    let toCheck = scene.tweenTracks[scene.currentTweenTrackId].tweens
+
+    for i in 1..high(toCheck):
+      check toCheck[i].startTime - last ~= staggering
+      check toCheck[i].duration ~= duration
+
+      last = toCheck[i].startTime
+
+
 suite "Easings, Tweens and Interpolations":
   test "Easings":
     check linear(0.1) ~= 0.1
