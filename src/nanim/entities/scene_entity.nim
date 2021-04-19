@@ -1,8 +1,7 @@
 
 import
   nanim/core,
-  nanim/animation,
-  nanovg
+  nanim/animation
 
 
 type

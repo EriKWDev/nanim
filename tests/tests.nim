@@ -104,7 +104,7 @@ suite "Scene & Entity tests":
       staggering = 200.0
       duration = 2000.0
 
-    scene.stagger(staggering, duration, tweens)
+    scene.stagger(staggering, tweens.with(duration=duration))
 
     var last = 0.0
     let toCheck = scene.tweenTracks[scene.currentTweenTrackId].tweens
