@@ -50,10 +50,10 @@ proc setupCallbacks(scene: Scene) =
     scene.tick()
 
 
-proc setupRendering(userScene: Scene, resizable: bool = true, width: int = 1920, height: int = 1080) =
+proc setupRendering(userScene: Scene, resizable: bool = true) =
   var scene = userScene
   initialize()
-  scene.window = createWindow(resizable, width, height)
+  scene.window = createWindow(resizable, scene.width, scene.height)
   if resizable: scene.setupCallbacks()
 
   doAssert glInit()
@@ -222,11 +222,8 @@ proc renderVideoWithPipe(scene: Scene) =
 
 
 proc render*(userScene: Scene) =
-  var scene = userScene.deepCopy()
-
   var
-    width = 1920
-    height = 1080
+    scene = userScene.deepCopy()
     createVideo = false
 
   for kind, key, value in getOpt():
@@ -244,24 +241,24 @@ proc render*(userScene: Scene) =
         createVideo = true
         scene.debug = false
       of "w", "width":
-        width = value.parseInt()
+        scene.width = value.parseInt()
       of "h", "height":
-        height = value.parseInt()
+        scene.height = value.parseInt()
       of "1080p", "fullhd":
         createVideo = true
         scene.debug = false
-        width = 1920
-        height = 1080
+        scene.width = 1920
+        scene.height = 1080
       of "1440p", "2k":
         createVideo = true
         scene.debug = false
-        width = 2880
-        height = 1440
+        scene.width = 2880
+        scene.height = 1440
       of "2560p", "4k":
         createVideo = true
         scene.debug = false
-        width = 3840
-        height = 2160
+        scene.width = 3840
+        scene.height = 2160
       of "debug":
         scene.debug = value.parseBool()
       else:
@@ -292,7 +289,7 @@ proc render*(userScene: Scene) =
 
     of cmdEnd: discard
 
-  scene.setupRendering(not createVideo, width, height)
+  scene.setupRendering(not createVideo)
 
   if createVideo:
     scene.renderVideoWithPipe()

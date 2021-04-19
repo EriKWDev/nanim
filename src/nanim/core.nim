@@ -585,6 +585,15 @@ proc move*(entity: Entity,
 
   result = newTween(interpolators)
 
+proc move*(entities: openArray[Entity],
+           dx: float = 0.0,
+           dy: float = 0.0,
+           dz: float = 0.0): seq[Tween] =
+  result = newSeq[Tween]()
+
+  for i in 0..high(entities):
+    result.add(entities[i].move(dx, dy, dz))
+
 
 proc moveTo*(entity: Entity,
            dx: float = 0.0,
@@ -649,12 +658,24 @@ proc stretchTo*(entity: Entity,
   result = newTween(interpolators)
 
 
+proc stretchTo*(entities: openArray[Entity],
+                dx: float = 1.0,
+                dy: float = 1.0,
+                dz: float = 1.0): seq[Tween] =
+  result = newSeq[Tween]()
+
+  for i in 0..high(entities):
+    result.add(entities[i].stretchTo(dx, dy, dz))
+
 proc scale*(entity: Entity, d: float = 1.0): Tween =
   return entity.stretch(d, d, d)
 
 
 proc scaleTo*(entity: Entity, d: float = 1.0): Tween =
   return entity.stretchTo(d, d, d)
+
+proc scaleTo*(entities: openArray[Entity], d: float = 1.0):  seq[Tween] =
+  return entities.stretchTo(d, d, d)
 
 
 proc pstretch*(entity: Entity, dx: float = 1.0, dy: float = 1.0, dz: float = 1.0): Tween =
@@ -875,6 +896,8 @@ proc init(scene: Scene) =
   scene.lastTickTime = 0.0
   scene.tweenTracks = initOrderedTable[int, TweenTrack]()
   scene.currentTweenTrackId = defaultTrackId
+  scene.width = 1200
+  scene.height = 900
 
   scene.tweenTracks[scene.currentTweenTrackId] = newTweenTrack()
   scene.projectionMatrix = mat4x4[float](vec4[float](1,0,0,0),
@@ -986,15 +1009,19 @@ proc switchTrack*(scene: Scene, newTrackId: int = defaultTrackId) =
 template onTrack*(scene: Scene, trackId: int = defaultTrackId, body: untyped): untyped =
   let oldTrackId = scene.currentTweenTrackId
   scene.switchTrack(trackId)
-
   body
-
   scene.switchTrack(oldTrackId)
+
+
+template ignoreTrack*(scene: Scene, trackId: int = defaultTrackId, body: untyped): untyped =
+  when defined(release):
+    scene.onTrack(trackId, body)
+  else:
+    discard
 
 
 proc switchToDefaultTrack*(scene: Scene) =
   scene.switchTrack(defaultTrackId)
-
 
 
 proc getPreviousEndTime*(scene: Scene): float =
@@ -1013,19 +1040,18 @@ proc addTweens*(scene: Scene, tweens: varargs[Tween]) =
 proc animate*(scene: Scene, tweens: varargs[Tween]) =
   let previousEndtime = scene.getPreviousEndTime()
 
-  for tween in tweens:
-    tween.startTime = previousEndTime
+  for i in 0..high(tweens):
+    tweens[i].startTime = previousEndTime
 
   scene.addTweens(tweens)
 
 proc play*(scene: Scene, tweens: varargs[Tween]) = scene.animate(tweens)
 
-proc stagger*(scene: Scene, staggering: float, duration: float, tweens: varargs[Tween]) =
+proc stagger*(scene: Scene, staggering: float, tweens: varargs[Tween]) =
   let previousEndtime = scene.getPreviousEndTime()
 
-  for i, tween in tweens:
-    tween.startTime = previousEndTime + i.float * staggering
-    tween.duration = duration
+  for i in 0..high(tweens):
+    tweens[i].startTime = previousEndTime + i.float * staggering
 
   scene.addTweens(tweens)
 
