@@ -1,0 +1,39 @@
+name: Unittests Devel
+
+on:
+  push:
+    paths:
+    - 'src/**'
+    - 'tests/**'
+    - '.github/**'
+
+jobs:
+  nimble-test:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        nim:
+          - 'devel'
+        os:
+          - 'ubuntu-latest'
+
+    name: Tests on ${{ matrix.os }}, nim ${{ matrix.nim }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Cache nimble
+        id: cache-nimble
+        uses: actions/cache@v1
+        with:
+          path: ~/.nimble
+          key: ${{ runner.os }}-nimble-${{ hashFiles('*.nimble') }}
+        if: runner.os != 'Windows'
+
+      - name: Setup nim
+        uses: jiro4989/setup-nim-action@v1
+        with:
+          nim-version: ${{ matrix.nim }}
+
+      - name: Run nimble test
+        run: nimble test -Y
