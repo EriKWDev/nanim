@@ -1,6 +1,7 @@
 
 import
   glm,
+  hashes,
   glfw,
   tables,
   nanovg,
@@ -203,7 +204,6 @@ proc defaultPatternDrawer*(scene: Scene, width: float, height: float) =
 proc offset(some: pointer; b: int): pointer {.inline.} =
   result = cast[pointer](cast[int](some) + b)
 
-
 var patternCache = initTable[proc(scene: Scene, width: float, height: float): void, seq[Paint]]()
 
 proc gridPattern*(scene: Scene,
@@ -214,7 +214,10 @@ proc gridPattern*(scene: Scene,
                   numberOfCaches: int = 1): Paint =
 
   # Impure, but worth it for the performance benefit...
-  if cache and patternCache.hasKey(patternDrawer) and patternCache[patternDrawer].len >= numberOfCaches:
+  if cache and
+    patternCache.hasKey(patternDrawer) and
+    patternCache[patternDrawer].len >= numberOfCaches:
+
     return patternCache[patternDrawer][rand(0..high(patternCache[patternDrawer]))]
 
   let
