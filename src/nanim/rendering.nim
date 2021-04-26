@@ -44,10 +44,10 @@ proc createWindow(resizable: bool = true, width: int = 900, height: int = 500): 
 
 proc setupCallbacks(scene: Scene) =
   scene.window.framebufferSizeCb = proc(w: Window, s: tuple[w, h: int32]) =
-    scene.tick()
+    (scene.frameBufferWidth, scene.frameBufferHeight) = s
 
   scene.window.windowRefreshCb = proc(w: Window) =
-    scene.tick()
+    (scene.width, scene.height) = w.size
 
 
 proc setupRendering(userScene: Scene, resizable: bool = true) =
@@ -68,22 +68,14 @@ proc setupRendering(userScene: Scene, resizable: bool = true) =
 
   nvgInit(getProcAddress)
   scene.context = createNVGContext()
-
   scene.context.loadFonts()
+
+  scene.frameBufferHeight = scene.height.int32
+  scene.frameBufferWidth = scene.width.int32
+  scene.pixelRatio = 1
 
 
 proc beginFrame(scene: Scene) =
-  var (windowWidth, windowHeight) = scene.window.size
-
-  scene.width = windowWidth
-  scene.height = windowHeight
-
-  var (frameBufferWidth, frameBufferHeight) = scene.window.framebufferSize
-
-  scene.frameBufferHeight = frameBufferHeight
-  scene.frameBufferWidth = frameBufferWidth
-  scene.pixelRatio = 1
-
   glViewport(0, 0, scene.frameBufferWidth, scene.frameBufferHeight)
   scene.context.beginFrame(scene.width.cfloat, scene.height.cfloat, scene.pixelRatio)
 
@@ -223,7 +215,7 @@ proc renderVideoWithPipe(scene: Scene) =
 
 proc render*(userScene: Scene) =
   var
-    scene = userScene.deepCopy()
+    scene = userScene
     createVideo = false
 
   for kind, key, value in getOpt():
