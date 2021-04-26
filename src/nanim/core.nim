@@ -135,6 +135,16 @@ proc clearWithColor*(color: Color = rgba(0, 0, 0, 0)) =
           GL_STENCIL_BUFFER_BIT)
 
 
+proc drawPoints*(context: NVGContext, points: seq[Vec]) =
+  if len(points) < 2: return
+
+  context.moveTo(points[0].x, points[0].y)
+
+  for i in 1..high(points):
+    let point = points[i]
+    context.lineTo(point.x, point.y)
+
+
 proc drawPointsWithTension*(context: NVGContext, points: seq[Vec], tension: float = 0.5) =
   if len(points) < 2: return
 
@@ -471,8 +481,12 @@ proc applyStyle*(scene: Scene, style: Style) =
 
 method draw*(entity: Entity, scene: Scene) {.base.} =
   let context = scene.context
+
   context.beginPath()
-  if entity.tension > 0:
+
+  if entity.tension <= 0 and entity.cornerRadius <= 0:
+    context.drawPoints(entity.points)
+  elif entity.tension > 0:
     context.drawPointsWithTension(entity.points, entity.tension)
   else:
     context.drawPointsWithRoundedCornerRadius(entity.points, entity.cornerRadius)
@@ -1140,13 +1154,20 @@ proc draw*(scene: Scene, entity: Entity) =
   scene.context.scale(entity.scaling.x, entity.scaling.y)
   scene.context.rotate(entity.rotation)
 
-  for child in entity.children:
-    scene.draw(child)
+  for i in 0..high(entity.children):
+    scene.draw(entity.children[i])
 
   entity.draw(scene)
 
   scene.context.restore()
 
+
+let
+  vizBlue = rgb(100, 100, 200)
+  vizGreen = rgb(100, 200, 100)
+  vizRed = rgb(256, 100, 130)
+  vizLightBlue = rgb(100, 200, 200)
+  invizible = rgba(256, 100, 130, 0)
 
 proc visualizeTracks(scene: Scene) =
   scene.context.save()
@@ -1166,16 +1187,16 @@ proc visualizeTracks(scene: Scene) =
 
   var i = 0
   for id, track in scene.tweenTracks.pairs:
-    scene.context.fillColor(rgb(100, 100, 200))
+    scene.context.fillColor(vizBlue)
     scene.context.textAlign(haLeft, vaMiddle)
     scene.context.globalAlpha(1.0)
     discard scene.context.text(-80, (i.float + 0.7) * trackHeight, "Track #" & $(id))
     scene.context.globalAlpha(0.3)
 
     for tween in track.tweens:
-      scene.context.fillColor(rgb(100, 100, 200))
+      scene.context.fillColor(vizBlue)
       if tween.interpolators.len() == 0:
-        scene.context.strokeColor(rgb(100, 200, 100))
+        scene.context.strokeColor(vizGreen)
 
       scene.context.beginPath()
       scene.context.roundedRect(tween.startTime/endTime * unit + 5,
@@ -1198,7 +1219,7 @@ proc visualizeTracks(scene: Scene) =
   if scene.restartTime > 0:
     let x = scene.restartTime/endTime * unit
 
-    let gradient = scene.context.linearGradient(x, 2.5, x + 200, 2.5, rgb(256, 100, 130), rgba(256, 100, 130, 0))
+    let gradient = scene.context.linearGradient(x, 2.5, x + 200, 2.5, vizRed, invizible)
 
     scene.context.beginPath()
     scene.context.roundedRect(x + 2.5, 2.5, 1 * unit, trackHeight * numberOfTracks.float, 10)
@@ -1206,7 +1227,7 @@ proc visualizeTracks(scene: Scene) =
     scene.context.strokePaint(gradient)
     scene.context.stroke()
 
-  scene.context.fillColor(rgb(100, 200, 200))
+  scene.context.fillColor(vizLightBlue)
   scene.context.beginPath()
   let x = scene.time/endTime * unit
   scene.context.circle(x, 5, 5)
@@ -1222,7 +1243,8 @@ proc draw*(scene: Scene) =
   scene.scaleToUnit()
   scene.background(scene)
 
-  for entity in scene.entities:
+  for i in 0..high(scene.entities):
+    let entity = scene.entities[i]
     #[var intermediate = entity.deepCopy()
 
     # TODO: Decide what to do with projection of entity.children here...
@@ -1231,7 +1253,7 @@ proc draw*(scene: Scene) =
                                        proc(point: Vec3[float]): Vec3[float] =
                                          point.project(scene.projectionMatrix))]#
 
-    if entity.style.opacity <= 0 and len(entity.children) == 0:
+    if (entity.scaling.x == 0 and entity.scaling.y == 0) or len(entity.children) == 0 and (entity.style.opacity <= 0 or (entity.style.fillMode == smNone and entity.style.strokeMode == smNone) or (entity.position.x > 3000.0 or entity.position.x < -3000.0) or (entity.position.y > 3000.0 or entity.position.y < -3000.0)):
       continue
 
     scene.draw(entity)
@@ -1260,13 +1282,13 @@ proc tick*(scene: Scene, deltaTime: float = 1000.0/120.0) =
 
 
 proc update*(scene: Scene) =
-  let time = cpuTime() * 1000.0
+  let
+    time = cpuTime() * 1000.0
+    goalDelta = 1000.0/120.0
+    delta = time - scene.lastTickTime
 
-  # Try to adhere to a max 120 fps
-  let goalDelta = 1000.0/120.0
-
-  if time - scene.lastTickTime >= goalDelta:
-    scene.tick(time - scene.lastTickTime)
+  if delta >= goalDelta:
+    scene.tick(delta)
 
     if scene.done:
       scene.time = scene.restartTime

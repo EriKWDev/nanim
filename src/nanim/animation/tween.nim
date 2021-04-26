@@ -1,6 +1,5 @@
 
 import
-  algorithm,
   nanim/animation/easings
 
 
@@ -24,20 +23,18 @@ type
 
 var defaultDuration*: float = 1100.0
 
+proc execute*(tween: Tween, t: float) {.inline.} =
+  for interpolator in tween.interpolators:
+    interpolator(t)
+
 
 proc evaluate*(tween: Tween, time: float) =
-  var t = if tween.duration <= 0:
+  let t = if tween.duration <= 0:
       1.0
     else:
       tween.easing(min(1.0, max(0.0, (time - tween.startTime)/tween.duration)))
 
-  for interpolator in tween.interpolators:
-    interpolator(t)
-
-
-proc execute*(tween: Tween, t: float) =
-  for interpolator in tween.interpolators:
-    interpolator(t)
+  tween.execute(t)
 
 
 proc evaluate*(tweenTrack: TweenTrack, time: float) =
@@ -48,7 +45,8 @@ proc evaluate*(tweenTrack: TweenTrack, time: float) =
   tweenTrack.currentTweens = @[]
   tweenTrack.futureTweens = @[]
 
-  for tween in tweenTrack.tweens:
+  for i in 0..high(tweenTrack.tweens):
+    let tween = tweenTrack.tweens[i]
     if time > tween.startTime + tween.duration:
       tweenTrack.oldTweens.add(tween)
     elif time < tween.startTime:
@@ -56,14 +54,14 @@ proc evaluate*(tweenTrack: TweenTrack, time: float) =
     else:
       tweenTrack.currentTweens.add(tween)
 
-  for tween in tweenTrack.oldTweens:
-    tween.execute(1.0)
+  for i in 0..high(tweenTrack.oldTweens):
+    tweenTrack.oldTweens[i].execute(1.0)
 
-  for tween in tweenTrack.futureTweens.reversed():
-    tween.execute(0.0)
+  for i in countdown(high(tweenTrack.futureTweens), 0, 1):
+    tweenTrack.futureTweens[i].execute(0.0)
 
-  for tween in tweenTrack.currentTweens:
-    tween.evaluate(time)
+  for i in 0..high(tweenTrack.currentTweens):
+    tweenTrack.currentTweens[i].evaluate(time)
 
   tweenTrack.done = false
 
@@ -71,7 +69,7 @@ proc evaluate*(tweenTrack: TweenTrack, time: float) =
     tweenTrack.done = true
 
 
-proc add*(tweenTrack: TweenTrack, tweens: varargs[Tween]) =
+proc add*(tweenTrack: TweenTrack, tweens: varargs[Tween]) {.inline.} =
   tweenTrack.tweens.add(tweens)
 
 

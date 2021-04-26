@@ -62,11 +62,11 @@ proc interpolate*(fromValue: int, toValue: int, t: float): int =
 proc interpolate*(fromValue: seq[Vec3[float]],
                   toValue: seq[Vec3[float]],
                   t: float): seq[Vec3[float]] =
-  var newPoints: seq[Vec3[float]]
+  var newPoints = newSeq[Vec3[float]](len(fromValue))
 
   let fromTo = zip(fromValue, toValue)
-  for _, points in fromTo:
-    newPoints.add(interpolate(points[0], points[1], t))
+  for i, points in fromTo:
+    newPoints[i] = interpolate(points[0], points[1], t)
 
   return newPoints
 
