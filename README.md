@@ -9,6 +9,14 @@
 ### About
 Nanim is an easy-to-use framework to create smooth GPU-accelerated animations that can be previewed live inside a glfw window and, when ready, rendered to videos at an arbitrary resolution and framerate.
 
+### What can be done using Nanim?
+I have a series of animations made using nanim posted to my [Instagram Page](https://www.instagram.com/erikwdev/). Some of them include:
+
+|![Bricks](https://user-images.githubusercontent.com/19771356/116243662-74530500-a767-11eb-8e0f-214a2034266e.gif)|![Triangle Ball](https://user-images.githubusercontent.com/19771356/116243464-4372d000-a767-11eb-88d9-449110c1a8a2.gif)|![Dot Attack](https://user-images.githubusercontent.com/19771356/116243885-b3815600-a767-11eb-9055-e763dd54515a.gif)|
+|--|--|--|
+|![Lots o' dots](https://user-images.githubusercontent.com/19771356/116244643-6782e100-a768-11eb-99c4-b0be68d89051.gif)|![Daily Art](https://user-images.githubusercontent.com/19771356/116244886-a2851480-a768-11eb-9d30-fb2295cbe490.gif)|![Web](https://user-images.githubusercontent.com/19771356/116245061-d6f8d080-a768-11eb-9c2e-9ce443083a37.gif)|
+
+
 ### Usage
 Create a normal nim program where you create a Nanim Scene. This scene will carry the state of all animations and entities. Here is what a simple scene might look like:
 ```nim
@@ -31,6 +39,7 @@ proc testScene(): Scene =
   scene.wait(500)
   scene.showAllEntities()
   scene.wait(500)
+![output](https://user-images.githubusercontent.com/19771356/116243628-6bfaca00-a767-11eb-9635-f2825944a4ef.gif)
 
   # scene.play() and scene.animate() animates any number of tweens and
   # can be used interchangeably
