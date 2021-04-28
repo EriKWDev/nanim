@@ -124,7 +124,7 @@ proc renderVideoWithPipe(scene: Scene) =
     # "-loglevel", "panic",
     "-c:v", "libx264",  # * H.264 encoding
     "-preset", "medium",  # * Should probably stay at fast/medium later
-    "-crf", "18",  # * Ranges 0-51 indicates lossless compression to worst compression. Sane options are 0-30
+    "-crf", "17",  # * Ranges 0-51 indicates lossless compression to worst compression. Sane options are 0-30
     "-tune", "animation",  # * Tunes the encoder for animation and 'cartoons'
     "-pix_fmt", "yuv444p" # * Minimal color data loss on H.264 encode
   ]
@@ -180,7 +180,7 @@ proc renderVideoWithPipe(scene: Scene) =
     swapBuffers(scene.window)
 
     try:
-      if bufferSize * n > 300000000:
+      if n > 60:
         restartFFMPeg(i)
         n = 0
 

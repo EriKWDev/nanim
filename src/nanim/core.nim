@@ -53,6 +53,12 @@ type
 
     children*: seq[Entity]
 
+  PEntity* = ref object of Entity
+    image*: Paint
+
+  VEntity* = ref object of Entity
+    vpoints*: seq[Vec3[float]]
+
   Scene* = ref object of RootObj
     window*: Window
     context*: NVGContext
@@ -81,6 +87,119 @@ type
 
     done*: bool
     debug*: bool
+
+
+# proc `+`[T](a, b: seq[T]): seq[T] {.inline.} =
+#   assert(len(a) == len(b))
+#   for i in 0..high(a): result.add(a[i] + b[i])
+
+# proc `-`[T](a, b: seq[T]): seq[T] {.inline.} =
+#   assert(len(a) == len(b))
+#   for i in 0..high(a): result.add(a[i] - b[i])
+
+# proc `*`[T](a, b: seq[T]): seq[T] {.inline.} =
+#   assert(len(a) == len(b))
+#   for i in 0..high(a): result.add(a[i] * b[i])
+
+# proc `>`[T, V](a: seq[T], b: V): seq[bool] {.inline.} =
+#   for i in 0..high(a): result.add(a[i] > b)
+
+# proc `[]`[T](a: seq[T], b: seq[bool]): seq[T] =
+#   for i in 0..high(a):
+#     if b[i] == true:
+#       result.add(a[i])
+
+# proc `[]`[T](a: seq[T], b: bool): seq[T] =
+#   if b == true: return a else: return newSeq[T](len(a))
+
+# proc arange(start: int, stop: int, step: int): seq[int] =
+#   for i in countup(start, stop, step):
+#     result.add(i)
+
+# func getSubPathsFromPoints*(points: seq[Vec3[float]]): seq[Vec3[float]] =
+#   let
+#     nppc = pointsPerCurve
+#     # diffs = points[nppc - 1:-1:nppc] - points[nppc::nppc]
+#     diffs = points - points
+#     splits = sum(diffs * diffs).y > toleranceForPointEquality
+#     split_indices = arange(nppc, len(points), nppc)[splits]
+
+#   var new_indicies = newSeq[int](2 + len(split_indices))
+
+#   new_indicies.add(0)
+#   for n in split_indices:
+#     new_indicies.add(n)
+
+#   for (i1, i2) in zip(new_indicies, new_indicies[1..^1]):
+#     if i2 - i1 >= nppc:
+#       result.add(points[i1..<i2])
+
+
+# func getSubPathsFromVEntity*(ventity: VEntity): seq[Vec3[float]] {.inline.} =
+#   return getSubPathsFromPoints(ventity.points)
+
+const
+  pointsPerCurve* = 3
+  toleranceForPointEquality* = 1e-8
+  toleranceForPointEqualitySquared* = toleranceForPointEquality*toleranceForPointEquality
+
+func getReflectionOfLastHandle(ventity: VEntity): Vec3[float] {.inline.} =
+  return 2.0 * ventity.points[^1] - ventity.points[^2]
+
+
+func hasNewPathStarted*(ventity: VEntity): bool {.inline.} =
+  return len(ventity.points) mod pointsPerCurve == 1
+
+
+func arePointsConsideredEqual*(points: varargs[Vec3[float]]): bool =
+  if len(points) < 1: return true
+
+  for point in points[1..^1]:
+    if length(point - points[0]) > toleranceForPointEquality:
+      return false
+
+  return true
+
+proc isPathClosed*(ventity: VEntity): bool {.inline.} =
+  return arePointsConsideredEqual(ventity.points[0], ventity.points[^1])
+
+
+proc addLineTo*(ventity: VEntity, point: Vec3[float]) =
+  let lastPoint = ventity.points[^1]
+
+  for i in 0..pointsPerCurve:
+    let t = interpolate(0.0, 1.0, i.float/pointsPerCurve.float)
+    ventity.points.add(interpolate(lastPoint, point, t))
+
+
+proc closePath*(ventity: VEntity) =
+  if not ventity.isPathClosed():
+    ventity.addLineTo(ventity.points[^1]) # TODO: Investigate what manim's 'subpaths' are
+
+
+proc addQuadraticBezierCurveTo*(ventity: VEntity,
+                                handle: Vec3[float],
+                                anchor: Vec3[float]) {.inline.} =
+  if ventity.hasNewPathStarted():
+    ventity.points.add(@[handle, anchor])
+  else:
+    ventity.points.add(@[ventity.points[^1], handle, anchor])
+
+
+proc addSmoothCurveTo*(ventity: Ventity, point: Vec3[float]) =
+  if ventity.hasNewPathStarted():
+    ventity.addLineTo(point)
+  else:
+    let handle = ventity.getReflectionOfLastHandle()
+    ventity.addQuadraticBezierCurveTo(handle, point)
+
+
+proc addSmoothCubicCurveTo*(ventity: VEntity,
+                            handle: Vec3[float],
+                            point: Vec3[float]) {.inline.} =
+  ventity.points.add(@[ventity.getReflectionOfLastHandle(), handle, point])
+
+
 
 
 const
@@ -178,7 +297,7 @@ proc drawPointsWithRoundedCornerRadius*(context: NVGContext, points: seq[Vec], c
 
     var p1 = points[0]
 
-    let lastPoint = points[high(points)]
+    let lastPoint = points[^1]
     let midPoint = vec2((p1.x + lastPoint.x) / 2.0, (p1.y + lastPoint.y) / 2.0)
 
     context.moveTo(midPoint.x, midPoint.y)
@@ -757,6 +876,13 @@ proc rotate*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngle
   entity.rotation = endValue
 
   result = newTween(interpolators)
+
+
+proc rotate*(entities: openArray[Entity], dangle: float = 0.0, mode: AngleMode = defaultAngleMode): seq[Tween] =
+  result = newSeq[Tween]()
+
+  for i in 0..high(entities):
+    result.add(entities[i].rotate(dangle, mode))
 
 
 proc fill*(entity: Entity, fillColor: Color): Tween =
