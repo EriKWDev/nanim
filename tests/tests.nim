@@ -368,6 +368,21 @@ suite "Styles":
     check entity.style.strokeWidth ~= 30
 
 
+suite "Vector Entities and Utilities":
+  test "Point Equality":
+    check arePointsConsideredEqual(vec3(0.0, 0.0, 0.0), vec3(0.0, 0.0, 0.0)) == true
+    check arePointsConsideredEqual(vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0)) == false
+    check arePointsConsideredEqual(vec3(0.0, 0.0, 0.0), vec3(0.0, toleranceForPointEquality, 0.0)) == true
+    check arePointsConsideredEqual(vec3(0.0, 0.0, 0.0), vec3(0.0, toleranceForPointEquality*2, 0.0)) == false
+
+    check arePointsConsideredEqual(vec3(0.0, 0.0, 0.0),
+                                   vec3(0.0, 0.0, toleranceForPointEquality),
+                                   vec3(0.0, toleranceForPointEquality, 0.0),
+                                   vec3(toleranceForPointEquality, 0.0, 0.0)) == true
+
+    check arePointsConsideredEqual(vec3(0.0, 0.0, 0.0), vec3(0.0, toleranceForPointEquality, toleranceForPointEquality)) == false
+
+
 suite "Other":
   test "Entity Extents":
     let
