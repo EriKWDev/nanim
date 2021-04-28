@@ -39,7 +39,6 @@ proc testScene(): Scene =
   scene.wait(500)
   scene.showAllEntities()
   scene.wait(500)
-![output](https://user-images.githubusercontent.com/19771356/116243628-6bfaca00-a767-11eb-9635-f2825944a4ef.gif)
 
   # scene.play() and scene.animate() animates any number of tweens and
   # can be used interchangeably
