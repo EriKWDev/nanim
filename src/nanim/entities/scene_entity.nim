@@ -58,7 +58,7 @@ method draw*(sceneEntity: SceneEntity, mainScene: Scene) =
     sceneEntity.scene.time = sceneEntity.scene.restartTime
 
 
-proc play*(entity: SceneEntity): Tween =
+proc play*(entity: SceneEntity): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
   let startValue = entity.paused.deepCopy()
 
@@ -70,10 +70,10 @@ proc play*(entity: SceneEntity): Tween =
 
   result = newTween(interpolators)
 
-proc start*(entity: SceneEntity): Tween =
+proc start*(entity: SceneEntity): Tween {.discardable.} =
   entity.play()
 
-proc pause*(entity: SceneEntity): Tween =
+proc pause*(entity: SceneEntity): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
   let startValue = entity.paused.deepCopy()
 
@@ -85,5 +85,5 @@ proc pause*(entity: SceneEntity): Tween =
 
   result = newTween(interpolators)
 
-proc stop*(entity: SceneEntity): Tween =
+proc stop*(entity: SceneEntity): Tween {.discardable.} =
   entity.pause()

@@ -84,7 +84,7 @@ method draw*(textBox: TextBox, scene: Scene) =
   context.closePath()
 
 
-proc setFontSize*(entity: Text|TextBox, fontSize: float = 8): Tween =
+proc setFontSize*(entity: Text|TextBox, fontSize: float = 8): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
 
   let
