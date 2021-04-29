@@ -6,6 +6,7 @@ import
   tables,
   nanovg,
   sequtils,
+  algorithm,
   os,
   math,
   times,
@@ -89,62 +90,18 @@ type
     debug*: bool
 
 
-# proc `+`[T](a, b: seq[T]): seq[T] {.inline.} =
-#   assert(len(a) == len(b))
-#   for i in 0..high(a): result.add(a[i] + b[i])
-
-# proc `-`[T](a, b: seq[T]): seq[T] {.inline.} =
-#   assert(len(a) == len(b))
-#   for i in 0..high(a): result.add(a[i] - b[i])
-
-# proc `*`[T](a, b: seq[T]): seq[T] {.inline.} =
-#   assert(len(a) == len(b))
-#   for i in 0..high(a): result.add(a[i] * b[i])
-
-# proc `>`[T, V](a: seq[T], b: V): seq[bool] {.inline.} =
-#   for i in 0..high(a): result.add(a[i] > b)
-
-# proc `[]`[T](a: seq[T], b: seq[bool]): seq[T] =
-#   for i in 0..high(a):
-#     if b[i] == true:
-#       result.add(a[i])
-
-# proc `[]`[T](a: seq[T], b: bool): seq[T] =
-#   if b == true: return a else: return newSeq[T](len(a))
-
-# proc arange(start: int, stop: int, step: int): seq[int] =
-#   for i in countup(start, stop, step):
-#     result.add(i)
-
-# func getSubPathsFromPoints*(points: seq[Vec3[float]]): seq[Vec3[float]] =
-#   let
-#     nppc = pointsPerCurve
-#     # diffs = points[nppc - 1:-1:nppc] - points[nppc::nppc]
-#     diffs = points - points
-#     splits = sum(diffs * diffs).y > toleranceForPointEquality
-#     split_indices = arange(nppc, len(points), nppc)[splits]
-
-#   var new_indicies = newSeq[int](2 + len(split_indices))
-
-#   new_indicies.add(0)
-#   for n in split_indices:
-#     new_indicies.add(n)
-
-#   for (i1, i2) in zip(new_indicies, new_indicies[1..^1]):
-#     if i2 - i1 >= nppc:
-#       result.add(points[i1..<i2])
-
-
-# func getSubPathsFromVEntity*(ventity: VEntity): seq[Vec3[float]] {.inline.} =
-#   return getSubPathsFromPoints(ventity.points)
-
 const
   pointsPerCurve* = 3
   toleranceForPointEquality* = 1e-8
   toleranceForPointEqualitySquared* = toleranceForPointEquality*toleranceForPointEquality
 
-func getReflectionOfLastHandle(ventity: VEntity): Vec3[float] {.inline.} =
+func getReflectionOfLastHandle*(ventity: VEntity): Vec3[float] {.inline.} =
   return 2.0 * ventity.points[^1] - ventity.points[^2]
+
+
+proc startNewPath*(ventity: VEntity, point: Vec3[float]) =
+  assert(len(ventity.points) mod pointsPerCurve == 0)
+  ventity.points.add(point)
 
 
 func hasNewPathStarted*(ventity: VEntity): bool {.inline.} =
@@ -177,13 +134,34 @@ proc closePath*(ventity: VEntity) =
     ventity.addLineTo(ventity.points[^1]) # TODO: Investigate what manim's 'subpaths' are
 
 
+proc quadraticApproximationOfCubic(anchor1: Vec3[float],
+                                   handle1: Vec3[float],
+                                   handle2: Vec3[float],
+                                   anchor2: Vec3[float]): seq[Vec3[float]] =
+  discard
+
+proc addCubicBezierCurve*(ventity: VEntity,
+                          anchor1: Vec3[float],
+                          handle1: Vec3[float],
+                          handle2: Vec3[float],
+                          anchor2: Vec3[float]) =
+  ventity.points.add([anchor1, handle1, handle2, anchor2])
+
+
+proc addCubicBezierCurveTo*(ventity: VEntity,
+                            handle1: Vec3[float],
+                            handle2: Vec3[float],
+                            anchor: Vec3[float]) =
+    ventity.points.add([handle1, handle2, anchor])
+
+
 proc addQuadraticBezierCurveTo*(ventity: VEntity,
                                 handle: Vec3[float],
                                 anchor: Vec3[float]) {.inline.} =
   if ventity.hasNewPathStarted():
-    ventity.points.add(@[handle, anchor])
+    ventity.points.add([handle, anchor])
   else:
-    ventity.points.add(@[ventity.points[^1], handle, anchor])
+    ventity.points.add([ventity.points[^1], handle, anchor])
 
 
 proc addSmoothCurveTo*(ventity: Ventity, point: Vec3[float]) =
@@ -197,9 +175,7 @@ proc addSmoothCurveTo*(ventity: Ventity, point: Vec3[float]) =
 proc addSmoothCubicCurveTo*(ventity: VEntity,
                             handle: Vec3[float],
                             point: Vec3[float]) {.inline.} =
-  ventity.points.add(@[ventity.getReflectionOfLastHandle(), handle, point])
-
-
+  ventity.points.add([ventity.getReflectionOfLastHandle(), handle, point])
 
 
 const
@@ -436,7 +412,7 @@ proc gradient*(scene: Scene, c1: Color = rgb(255, 0, 255), c2: Color = rgb(0, 0,
   result = scene.context.linearGradient(0, 0, 100, 100, c1, c2)
 
 
-func newStyle*(fillMode = smPaintPattern,
+func newStyle*(fillMode = smSolidColor,
                fillColor = rgb(255, 56, 116),
                fillPattern = defaultPattern,
 
@@ -522,9 +498,7 @@ let
   defaultPaint*: Style = newStyle().copyWith(fillMode=smSolidColor, strokeMode=smSolidColor, strokeWidth=0.0)
   bluePaint*: Style = defaultPaint.copyWith(fillColor=rgb(55, 100, 220), strokeColor=rgb(75, 80, 223), strokeWidth=30.0)
   noisePaint*: Style = defaultPaint.copyWith(fillPattern=noisePattern, fillMode=smPaintPattern)
-  gradientPaint*: Style = noisePaint.copyWith(fillPattern =
-                                                proc(scene: Scene): Paint =
-                                                  gradient(scene))
+  gradientPaint*: Style = noisePaint.copyWith(fillPattern = proc(scene: Scene): Paint = gradient(scene))
 
 
 proc setStyle*(scene: Scene, style: Style) =
@@ -632,6 +606,61 @@ proc newEntity*(points: seq[Vec3[float]] = @[]): Entity =
   new(result)
   result.init()
   result.points = points
+
+import re, strutils
+
+
+let
+  pathRegex = re("[a-z][^a-z]*", {reIgnoreCase})
+  pathIgnoreRegex = re(",")
+
+proc newVEntityFromPathString*(path: string): VEntity =
+  new(result)
+  init(result.Entity)
+
+  let cleanPath = path.replace(pathIgnoreRegex, "")
+
+  for commandString in cleanPath.findAll(pathRegex):
+    let
+      command = commandString[0]
+      argString = commandString[1..^1].strip().splitWhitespace()
+
+    var args: seq[float]
+
+    for arg in argString:
+      args.add(arg.parseFloat())
+
+    case command:
+      of 'M':
+        echo "M: Move " & $args
+        result.startNewPath(vec3(args[0], args[1], 0.0))
+
+      of 'L', 'H', 'V':
+        echo command & ": Line " & $args
+        result.addLineTo(vec3(args[0], args[1], 0.0))
+
+      of 'C':
+        echo command & ": Cubic Bezier Curve " & $args
+        result.addCubicBezierCurveTo(vec3(args[0], args[1], 0.0), vec3(args[2], args[3], 0.0), vec3(args[4], args[5], 0.0))
+      of 'S':
+        echo command & ": Smooth Curve " & $args
+        result.addLineTo(vec3(args[0], args[1], 0.0))
+
+      of 'A':
+        echo command & ": Arc " & $args
+        result.addQuadraticBezierCurveTo(vec3(args[0], args[1], 0.0), vec3(args[2], args[3], 0.0))
+
+      of 'Z':
+        echo command & ": End " & $args
+
+      else:
+        echo command & ": Not Supported Yet"
+
+
+when isMainModule:
+  let
+    testPath = "M 230 80 A 45 45, 0, 1, 0, 275 125 L 275 80 Z"
+    a = newVEntityFromPathString(testPath)
 
 
 type
@@ -1181,12 +1210,14 @@ proc addTweens*(scene: Scene, tweens: varargs[Tween]) =
 
 
 proc animate*(scene: Scene, tweens: varargs[Tween]) =
-  let previousEndtime = scene.getPreviousEndTime()
+  let
+    previousEndtime = scene.getPreviousEndTime()
+    sortedTweens = tweens.toSeq().sortedByIt(it.duration)
 
-  for i in 0..high(tweens):
-    tweens[i].startTime = previousEndTime
+  for i in 0..high(sortedTweens):
+    sortedTweens[i].startTime = previousEndTime
 
-  scene.addTweens(tweens)
+  scene.addTweens(sortedTweens)
 
 proc play*(scene: Scene, tweens: varargs[Tween]) = scene.animate(tweens)
 
