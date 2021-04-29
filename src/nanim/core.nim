@@ -178,6 +178,16 @@ proc addSmoothCubicCurveTo*(ventity: VEntity,
   ventity.points.add([ventity.getReflectionOfLastHandle(), handle, point])
 
 
+proc addArcTo*(ventity: VEntity,
+               radiusX: float,
+               radiusY: float,
+               xAxisRotation: float,
+               largeArcFlag: float,
+               sweepFlag: float,
+               point: Vec3[float]) =
+  discard
+
+
 const
   defaultTrackId* = 0
   defaultAngleMode*: AngleMode = amDegrees
@@ -631,26 +641,26 @@ proc newVEntityFromPathString*(path: string): VEntity =
       args.add(arg.parseFloat())
 
     case command:
-      of 'M':
+      of 'M': # Move
         echo "M: Move " & $args
         result.startNewPath(vec3(args[0], args[1], 0.0))
 
-      of 'L', 'H', 'V':
+      of 'L', 'H', 'V': # Lines
         echo command & ": Line " & $args
         result.addLineTo(vec3(args[0], args[1], 0.0))
 
-      of 'C':
+      of 'C': # Bezier
         echo command & ": Cubic Bezier Curve " & $args
         result.addCubicBezierCurveTo(vec3(args[0], args[1], 0.0), vec3(args[2], args[3], 0.0), vec3(args[4], args[5], 0.0))
-      of 'S':
+      of 'S': # Smooth
         echo command & ": Smooth Curve " & $args
         result.addLineTo(vec3(args[0], args[1], 0.0))
 
-      of 'A':
+      of 'A': # Arc
         echo command & ": Arc " & $args
-        result.addQuadraticBezierCurveTo(vec3(args[0], args[1], 0.0), vec3(args[2], args[3], 0.0))
+        result.addArcTo(args[0], args[1], args[2], args[3], args[4], vec3(args[5], args[6], 0.0))
 
-      of 'Z':
+      of 'Z': # Close path
         echo command & ": End " & $args
 
       else:
@@ -660,6 +670,7 @@ proc newVEntityFromPathString*(path: string): VEntity =
 when isMainModule:
   let
     testPath = "M 230 80 A 45 45, 0, 1, 0, 275 125 L 275 80 Z"
+    testPathHeart = "M 10,30 A 20,20 0,0,1 50,30 A 20,20 0,0,1 90,30 Q 90,60 50,90 Q 10,60 10,30 z"
     a = newVEntityFromPathString(testPath)
 
 
@@ -712,7 +723,7 @@ proc add*(entity: Entity, child: Entity) =
   entity.children.add(child)
 
 
-proc show*(entity: Entity): Tween =
+proc show*(entity: Entity): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
   let delta = vec3(10.0, 0.0, 0.0)
 
@@ -732,7 +743,7 @@ proc show*(entity: Entity): Tween =
 proc move*(entity: Entity,
            dx: float = 0.0,
            dy: float = 0.0,
-           dz: float = 0.0): Tween =
+           dz: float = 0.0): Tween {.discardable.} =
 
   var interpolators: seq[proc(t: float)]
   let delta = vec3(dx, dy, dz)
@@ -763,7 +774,7 @@ proc move*(entities: openArray[Entity],
 proc moveTo*(entity: Entity,
            dx: float = 0.0,
            dy: float = 0.0,
-           dz: float = 0.0): Tween =
+           dz: float = 0.0): Tween {.discardable.} =
 
   var interpolators: seq[proc(t: float)]
 
@@ -784,7 +795,7 @@ proc moveTo*(entity: Entity,
 proc stretch*(entity: Entity,
               dx: float = 1.0,
               dy: float = 1.0,
-              dz: float = 1.0): Tween =
+              dz: float = 1.0): Tween {.discardable.} =
 
   var interpolators: seq[proc(t: float)]
 
@@ -805,7 +816,7 @@ proc stretch*(entity: Entity,
 proc stretchTo*(entity: Entity,
               dx: float = 1.0,
               dy: float = 1.0,
-              dz: float = 1.0): Tween =
+              dz: float = 1.0): Tween {.discardable.} =
 
   var interpolators: seq[proc(t: float)]
 
@@ -832,18 +843,18 @@ proc stretchTo*(entities: openArray[Entity],
   for i in 0..high(entities):
     result.add(entities[i].stretchTo(dx, dy, dz))
 
-proc scale*(entity: Entity, d: float = 1.0): Tween =
+proc scale*(entity: Entity, d: float = 1.0): Tween {.discardable.} =
   return entity.stretch(d, d, d)
 
 
-proc scaleTo*(entity: Entity, d: float = 1.0): Tween =
+proc scaleTo*(entity: Entity, d: float = 1.0): Tween {.discardable.} =
   return entity.stretchTo(d, d, d)
 
 proc scaleTo*(entities: openArray[Entity], d: float = 1.0):  seq[Tween] =
   return entities.stretchTo(d, d, d)
 
 
-proc pstretch*(entity: Entity, dx: float = 1.0, dy: float = 1.0, dz: float = 1.0): Tween =
+proc pstretch*(entity: Entity, dx: float = 1.0, dy: float = 1.0, dz: float = 1.0): Tween {.discardable.} =
 
   var interpolators: seq[proc(t: float)]
 
@@ -869,7 +880,7 @@ proc pstretch*(entity: Entity, dx: float = 1.0, dy: float = 1.0, dz: float = 1.0
   result = newTween(interpolators)
 
 
-proc pstretch*(entities: varargs[Entity], dx: float = 1.0, dy: float = 1.0, dz: float = 1.0): Tween =
+proc pstretch*(entities: varargs[Entity], dx: float = 1.0, dy: float = 1.0, dz: float = 1.0): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
 
   for entity in entities:
@@ -878,15 +889,15 @@ proc pstretch*(entities: varargs[Entity], dx: float = 1.0, dy: float = 1.0, dz: 
   result = newTween(interpolators)
 
 
-proc pscale*(entities: openArray[Entity], d: float = 1.0): Tween =
+proc pscale*(entities: openArray[Entity], d: float = 1.0): Tween {.discardable.} =
   return entities.pstretch(d, d, d)
 
 
-proc pscale*(entity: Entity, d: float = 1.0): Tween =
+proc pscale*(entity: Entity, d: float = 1.0): Tween {.discardable.} =
   return entity.pstretch(d, d, d)
 
 
-proc rotate*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngleMode): Tween =
+proc rotate*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngleMode): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -914,7 +925,7 @@ proc rotate*(entities: openArray[Entity], dangle: float = 0.0, mode: AngleMode =
     result.add(entities[i].rotate(dangle, mode))
 
 
-proc fill*(entity: Entity, fillColor: Color): Tween =
+proc fill*(entity: Entity, fillColor: Color): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -933,7 +944,7 @@ proc fill*(entity: Entity, fillColor: Color): Tween =
   result = newTween(interpolators)
 
 
-proc stroke*(entity: Entity, strokeColor: Color, strokeWidth: float = entity.style.strokeWidth): Tween =
+proc stroke*(entity: Entity, strokeColor: Color, strokeWidth: float = entity.style.strokeWidth): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -954,7 +965,7 @@ proc stroke*(entity: Entity, strokeColor: Color, strokeWidth: float = entity.sty
   result = newTween(interpolators)
 
 
-proc paint*(entity: Entity, style: Style): Tween =
+proc paint*(entity: Entity, style: Style): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -982,13 +993,13 @@ proc paint*(entity: Entity, style: Style): Tween =
   result = newTween(interpolators)
 
 
-proc fadeTo*(entity: Entity, opacity=1.0): Tween =
+proc fadeTo*(entity: Entity, opacity=1.0): Tween {.discardable.} =
   entity.paint(entity.style.copyWith(opacity=opacity))
 
-proc fadeIn*(entity: Entity): Tween = entity.fadeTo(1.0)
-proc fadeOut*(entity: Entity): Tween = entity.fadeTo(0.0)
+proc fadeIn*(entity: Entity): Tween {.discardable.} = entity.fadeTo(1.0)
+proc fadeOut*(entity: Entity): Tween {.discardable.} = entity.fadeTo(0.0)
 
-proc rotateTo*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngleMode): Tween =
+proc rotateTo*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngleMode): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -1009,7 +1020,7 @@ proc rotateTo*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAng
   result = newTween(interpolators)
 
 
-proc setTension*(entity: Entity, tension: float = 0.0): Tween =
+proc setTension*(entity: Entity, tension: float = 0.0): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -1026,7 +1037,7 @@ proc setTension*(entity: Entity, tension: float = 0.0): Tween =
   result = newTween(interpolators)
 
 
-proc setCornerRadius*(entity: Entity, cornerRadius: float = 0.0): Tween =
+proc setCornerRadius*(entity: Entity, cornerRadius: float = 0.0): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -1109,7 +1120,7 @@ proc loadFonts*(context: NVGContext) =
     context.loadFont(name, path)
 
 
-proc pscale*(scene: Scene, d: float = 0): Tween =
+proc pscale*(scene: Scene, d: float = 0): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -1126,7 +1137,7 @@ proc pscale*(scene: Scene, d: float = 0): Tween =
   result = newTween(interpolators)
 
 
-proc protate*(scene: Scene, dangle: float = 0, mode: AngleMode = defaultAngleMode): Tween =
+proc protate*(scene: Scene, dangle: float = 0, mode: AngleMode = defaultAngleMode): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -1147,7 +1158,7 @@ proc protate*(scene: Scene, dangle: float = 0, mode: AngleMode = defaultAngleMod
   result = newTween(interpolators)
 
 
-proc pmove*(scene: Scene, dx: float = 0, dy: float = 0, dz: float = 0): Tween =
+proc pmove*(scene: Scene, dx: float = 0, dy: float = 0, dz: float = 0): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
 
   let
@@ -1164,7 +1175,7 @@ proc pmove*(scene: Scene, dx: float = 0, dy: float = 0, dz: float = 0): Tween =
   result = newTween(interpolators)
 
 
-func getLatestTween*(scene: Scene): Tween =
+func getLatestTween*(scene: Scene): Tween {.discardable.} =
   discard scene.tweenTracks.hasKeyOrPut(scene.currentTweenTrackId, newTweenTrack())
   return scene.tweenTracks[scene.currentTweenTrackId].getLatestTween()
 
