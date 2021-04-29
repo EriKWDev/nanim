@@ -1175,7 +1175,7 @@ proc pmove*(scene: Scene, dx: float = 0, dy: float = 0, dz: float = 0): Tween {.
   result = newTween(interpolators)
 
 
-func getLatestTween*(scene: Scene): Tween {.discardable.} =
+func getLatestTween*(scene: Scene): Tween =
   discard scene.tweenTracks.hasKeyOrPut(scene.currentTweenTrackId, newTweenTrack())
   return scene.tweenTracks[scene.currentTweenTrackId].getLatestTween()
 
