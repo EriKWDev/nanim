@@ -40,6 +40,10 @@ func bounceOut*(t: float): float =
 
 func bounceIn*(t: float): float = return 1.0 - bounceOut(1.0 - t)
 
+func easeOutElastic*(t: float): float =
+  let c4 = (2.0 * PI) / 3.0
+
+  return pow(2.0, -10 * t) * sin((t * 10 - 0.75) * c4) + 1.0
 
 proc eitherOrInterpolation*[T](fromValue: T, toValue: T, t: float): T =
   return if t < 0.5: fromValue else: toValue

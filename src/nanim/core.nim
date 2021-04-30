@@ -295,14 +295,26 @@ proc drawPointsWithRoundedCornerRadius*(context: NVGContext, points: seq[Vec], c
 
     context.arcTo(p1.x, p1.y, midPoint.x, midPoint.y, cornerRadius)
 
+var
+  defaultPatternColor1* = rgb(20, 20, 20)
+  defaultPatternColor2* = rgb(20, 20, 20)
+
 
 proc defaultPatternDrawer*(scene: Scene, width: float, height: float) =
   let context = scene.context
+
   context.beginPath()
-  context.circle(width/2, height/2, width/2.2)
+  context.rect(0, 0, width, height)
   context.closePath()
 
-  context.fillColor(rgb(20, 20, 20))
+  context.fillColor(defaultPatternColor2)
+  context.fill()
+
+  context.beginPath()
+  context.circle(width/2, width/2, width/2.2)
+  context.closePath()
+
+  context.fillColor(defaultPatternColor1)
   context.fill()
 
 
@@ -814,9 +826,9 @@ proc stretch*(entity: Entity,
 
 
 proc stretchTo*(entity: Entity,
-              dx: float = 1.0,
-              dy: float = 1.0,
-              dz: float = 1.0): Tween {.discardable.} =
+                dx: float = 1.0,
+                dy: float = 1.0,
+                dz: float = 1.0): Tween {.discardable.} =
 
   var interpolators: seq[proc(t: float)]
 
@@ -1325,10 +1337,11 @@ proc draw*(scene: Scene, entity: Entity) =
   scene.context.scale(entity.scaling.x, entity.scaling.y)
   scene.context.rotate(entity.rotation)
 
+  entity.draw(scene)
+
   for i in 0..high(entity.children):
     scene.draw(entity.children[i])
 
-  entity.draw(scene)
 
   scene.context.restore()
 
