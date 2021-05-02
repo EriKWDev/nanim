@@ -105,6 +105,12 @@ func with*(bases: openArray[Tween], duration=defaultDuration, easing=defaultEasi
     result.add(base.with(duration, easing))
 
 
+func with*(bases: openArray[seq[Tween]], duration=defaultDuration, easing=defaultEasing): seq[Tween] =
+  result = newSeq[Tween]()
+  for base in bases:
+    result.add(base.with(duration, easing))
+
+
 func getLatestTween*(tweenTrack: TweenTrack): Tween =
   if len(tweenTrack.tweens) == 0:
     return newTween(@[], linear, 0)
