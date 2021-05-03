@@ -95,7 +95,7 @@ proc with*(base: Tween, duration=base.duration, easing=base.easing, startTime=ba
   result.interpolators = interpolators
 
 
-proc copyWith*(base: Tween, duration=base.duration, easing=base.easing, startTime=base.startTime, interpolators=base.interpolators): Tween =
+proc copyWith*(base: Tween, duration=base.duration, easing=base.easing, startTime=base.startTime, interpolators=base.interpolators): Tween {.inline.} =
   with(base, defaultDuration, easing, startTime, interpolators)
 
 
