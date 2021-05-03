@@ -773,20 +773,19 @@ proc move*(entity: Entity,
 
   result = newTween(interpolators)
 
+
 proc move*(entities: openArray[Entity],
            dx: float = 0.0,
            dy: float = 0.0,
-           dz: float = 0.0): seq[Tween] =
-  result = newSeq[Tween]()
-
+           dz: float = 0.0): seq[Tween] {.discardable.} =
   for i in 0..high(entities):
     result.add(entities[i].move(dx, dy, dz))
 
 
 proc moveTo*(entity: Entity,
-           dx: float = 0.0,
-           dy: float = 0.0,
-           dz: float = 0.0): Tween {.discardable.} =
+             dx: float = 0.0,
+             dy: float = 0.0,
+             dz: float = 0.0): Tween {.discardable.} =
 
   var interpolators: seq[proc(t: float)]
 
@@ -802,6 +801,16 @@ proc moveTo*(entity: Entity,
   entity.position = endValue
 
   result = newTween(interpolators)
+
+
+proc moveTo*(entities: openArray[Entity],
+           dx: float = 0.0,
+           dy: float = 0.0,
+           dz: float = 0.0): seq[Tween] {.discardable.} =
+  for i in 0..high(entities):
+    result.add(entities[i].moveTo(dx, dy, dz))
+
+
 
 
 proc stretch*(entity: Entity,
@@ -849,9 +858,7 @@ proc stretchTo*(entity: Entity,
 proc stretchTo*(entities: openArray[Entity],
                 dx: float = 1.0,
                 dy: float = 1.0,
-                dz: float = 1.0): seq[Tween] =
-  result = newSeq[Tween]()
-
+                dz: float = 1.0): seq[Tween] {.discardable.} =
   for i in 0..high(entities):
     result.add(entities[i].stretchTo(dx, dy, dz))
 
@@ -862,7 +869,7 @@ proc scale*(entity: Entity, d: float = 1.0): Tween {.discardable.} =
 proc scaleTo*(entity: Entity, d: float = 1.0): Tween {.discardable.} =
   return entity.stretchTo(d, d, d)
 
-proc scaleTo*(entities: openArray[Entity], d: float = 1.0):  seq[Tween] =
+proc scaleTo*(entities: openArray[Entity], d: float = 1.0):  seq[Tween] {.discardable.} =
   return entities.stretchTo(d, d, d)
 
 
@@ -930,9 +937,7 @@ proc rotate*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngle
   result = newTween(interpolators)
 
 
-proc rotate*(entities: openArray[Entity], dangle: float = 0.0, mode: AngleMode = defaultAngleMode): seq[Tween] =
-  result = newSeq[Tween]()
-
+proc rotate*(entities: openArray[Entity], dangle: float = 0.0, mode: AngleMode = defaultAngleMode): seq[Tween] {.discardable.} =
   for i in 0..high(entities):
     result.add(entities[i].rotate(dangle, mode))
 
@@ -1008,8 +1013,14 @@ proc paint*(entity: Entity, style: Style): Tween {.discardable.} =
 proc fadeTo*(entity: Entity, opacity=1.0): Tween {.discardable.} =
   entity.paint(entity.style.copyWith(opacity=opacity))
 
+proc fadeTo*(entities: openArray[Entity], opacity=1.0): seq[Tween] {.discardable.} =
+  for entity in entities:
+    result.add(entity.fadeTo(opacity))
+
 proc fadeIn*(entity: Entity): Tween {.discardable.} = entity.fadeTo(1.0)
+proc fadeIn*(entities: openArray[Entity]): seq[Tween] {.discardable.} = entities.fadeTo(1.0)
 proc fadeOut*(entity: Entity): Tween {.discardable.} = entity.fadeTo(0.0)
+proc fadeOut*(entities: openArray[Entity]): seq[Tween] {.discardable.} = entities.fadeTo(0.0)
 
 proc rotateTo*(entity: Entity, dangle: float = 0.0, mode: AngleMode = defaultAngleMode): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
@@ -1242,7 +1253,17 @@ proc animate*(scene: Scene, tweens: varargs[Tween]) =
 
   scene.addTweens(sortedTweens)
 
+
+proc animate*(scene: Scene, args: varargs[seq[seq[Tween]]]) =
+  var tweens: seq[Tween]
+  for arg in args:
+    for tween in arg:
+      tweens.add(tween)
+  scene.animate(tweens)
+
+
 proc play*(scene: Scene, tweens: varargs[Tween]) = scene.animate(tweens)
+proc play*(scene: Scene, args: varargs[seq[seq[Tween]]]) = scene.animate(args)
 
 proc stagger*(scene: Scene, staggering: float, tweens: varargs[Tween]) =
   let previousEndtime = scene.getPreviousEndTime()

@@ -116,6 +116,23 @@ suite "Scene & Entity tests":
       last = toCheck[i].startTime
 
 
+  test "Scene.play() / Scene.animate()":
+    let scene = newScene()
+
+    var a = newDot()
+
+    scene.play(a.move(10))
+    scene.animate(a.move(10))
+    scene.play([a.move(10), a.move(10)])
+    scene.animate([a.move(10), a.move(10)])
+
+    var ts = @[@[a.move(10), a.move(10)], @[a.move(10), a.move(10)]]
+
+    scene.play(ts)
+    scene.animate(ts)
+    scene.play(ts, ts, ts)
+    scene.animate(ts, ts, ts)
+
 suite "Easings, Tweens and Interpolations":
   test "Easings":
     check linear(0.1) ~= 0.1
@@ -128,10 +145,11 @@ suite "Easings, Tweens and Interpolations":
     check smoothOvershoot(0.0) ~= 0.0
     check smoothOvershoot(1.0) ~= 1.0
 
-    let easings = [linear, sigmoid2, sigmoid3, sigmoid4, sigmoid5, smoothOvershoot, inQuad, outQuad, inExpo, outExpo]
+    let easings = [linear, sigmoid2, sigmoid3, sigmoid4, sigmoid5, smoothOvershoot, inQuad, outQuad, inExpo, outExpo, easeOutElastic]
+
     for easingFunction in easings:
-      check easingFunction(0.0) ~= 0.0
-      check easingFunction(1.0) ~= 1.0
+      check (easingFunction(0.0) ~= 0.0) or (easingFunction(0.0) < 0.01 and easingFunction(1.0) > -0.01)
+      check (easingFunction(1.0) ~= 1.0) or (easingFunction(1.0) > 0.99 and easingFunction(1.0) < 1.01)
 
 
   test "Interpolations":
@@ -212,8 +230,10 @@ suite "Easings, Tweens and Interpolations":
     check entity.cornerRadius ~= 25.0
 
     discard entity.setCornerRadius(0.0)
-
     check entity.cornerRadius ~= 0.0
+
+    entity.setCornerRadius(10.0)
+    check entity.cornerRadius ~= 10.0
 
 
   test "Tween Options":
@@ -227,7 +247,6 @@ suite "Easings, Tweens and Interpolations":
     for easing in easings:
       let moveTween = circle.moveTo(100.0, 0).with(easing=easing)
       check moveTween.easing == easing
-
 
 
   test "Simple Tweens 1":
@@ -330,18 +349,26 @@ suite "Styles":
     check style.opacity ~= 0.5
     check style.strokeWidth ~= 30
 
+
   test "Style Copying With Modifications":
     let style0 = newStyle(opacity=1.0, strokeWidth=10)
     check style0.strokeWidth ~= 10
     check style0.opacity ~= 1.0
 
     let style1 = style0.copyWith(opacity=0.5, strokeWidth=30)
+    check style0.strokeWidth ~= 10
+    check style0.opacity ~= 1.0
     check style1.opacity ~= 0.5
     check style1.strokeWidth ~= 30
 
     let style2 = style1.copyWith(opacity=1.0)
+    check style0.strokeWidth ~= 10
+    check style0.opacity ~= 1.0
+    check style1.opacity ~= 0.5
+    check style1.strokeWidth ~= 30
     check style2.opacity ~= 1.0
     check style2.strokeWidth ~= 30
+
 
   test "Style Tweens":
     let style = newStyle(opacity=0.9, strokeWidth=5)
@@ -368,7 +395,7 @@ suite "Styles":
     check entity.style.strokeWidth ~= 30
 
 
-suite "Vector Entities and Utilities":
+suite "SVG, Vector Entities and Vector Utilities":
   test "Point Equality":
     check arePointsConsideredEqual(vec3(0.0, 0.0, 0.0), vec3(0.0, 0.0, 0.0)) == true
     check arePointsConsideredEqual(vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0)) == false
@@ -381,6 +408,7 @@ suite "Vector Entities and Utilities":
                                    vec3(toleranceForPointEquality, 0.0, 0.0)) == true
 
     check arePointsConsideredEqual(vec3(0.0, 0.0, 0.0), vec3(0.0, toleranceForPointEquality, toleranceForPointEquality)) == false
+    check arePointsConsideredEqual(vec3(0.0, 0.0, 0.0), vec3(toleranceForPointEquality, toleranceForPointEquality, toleranceForPointEquality)) == false
 
 
 suite "Other":
