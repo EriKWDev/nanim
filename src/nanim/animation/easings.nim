@@ -61,18 +61,33 @@ proc interpolate*(fromValue: int, toValue: int, t: float): int =
   interpolate(fromValue.float, toValue.float, t).int
 
 
+proc interpolatePointsOfSameSize*(fromValue: seq[Vec3[float]],
+                                  toValue: seq[Vec3[float]],
+                                  t: float): seq[Vec3[float]] =
+  result = newSeq[Vec3[float]](len(fromValue))
+
+  let fromTo = zip(fromValue, toValue)
+  for i, points in fromTo:
+    result[i] = interpolate(points[0], points[1], t)
+
+
 # Interpolation of sequence of points
 # TODO: Make sequences of differing size interpolate well too (somehow...)
 proc interpolate*(fromValue: seq[Vec3[float]],
                   toValue: seq[Vec3[float]],
                   t: float): seq[Vec3[float]] =
-  var newPoints = newSeq[Vec3[float]](len(fromValue))
+  let
+    lf = len(fromValue)
+    lt = len(toValue)
 
-  let fromTo = zip(fromValue, toValue)
-  for i, points in fromTo:
-    newPoints[i] = interpolate(points[0], points[1], t)
+  if lf == lt:
+    return interpolatePointsOfSameSize(fromValue, toValue, t)
 
-  return newPoints
+  if lf + 1 == lt:
+    return interpolatePointsOfSameSize(fromValue, toValue[0..^2], t) & interpolate(fromValue[^1], toValue[^1], t)
+
+  if lt + 1 == lf:
+    return interpolatePointsOfSameSize(fromValue[0..^2], toValue, t) & interpolate(toValue[^1], fromValue[^1], t)
 
 
 proc interpolate*(fromValue: Color, toValue: Color, t: float): Color =
