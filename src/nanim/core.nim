@@ -42,6 +42,7 @@ type
     opacity: float
 
   Entity* = ref object of RootObj
+    closed*: bool
     points*: seq[Vec3[float]]
 
     tension*: float
@@ -58,7 +59,6 @@ type
     image*: Paint
 
   VEntity* = ref object of Entity
-    vpoints*: seq[Vec3[float]]
 
   Scene* = ref object of RootObj
     window*: Window
@@ -100,7 +100,7 @@ func getReflectionOfLastHandle*(ventity: VEntity): Vec3[float] {.inline.} =
 
 
 proc startNewPath*(ventity: VEntity, point: Vec3[float]) =
-  assert(len(ventity.points) mod pointsPerCurve == 0)
+  doAssert(len(ventity.points) mod pointsPerCurve == 0)
   ventity.points.add(point)
 
 
@@ -124,44 +124,45 @@ proc isPathClosed*(ventity: VEntity): bool {.inline.} =
 proc addLineTo*(ventity: VEntity, point: Vec3[float]) =
   let lastPoint = ventity.points[^1]
 
-  for i in 0..pointsPerCurve:
+  for i in 1..pointsPerCurve:
     let t = interpolate(0.0, 1.0, i.float/pointsPerCurve.float)
     ventity.points.add(interpolate(lastPoint, point, t))
 
 
 proc closePath*(ventity: VEntity) =
-  if not ventity.isPathClosed():
-    ventity.addLineTo(ventity.points[^1]) # TODO: Investigate what manim's 'subpaths' are
+  ventity.closed = true
 
-
-proc quadraticApproximationOfCubic(anchor1: Vec3[float],
-                                   handle1: Vec3[float],
-                                   handle2: Vec3[float],
-                                   anchor2: Vec3[float]): seq[Vec3[float]] =
-  discard
 
 proc addCubicBezierCurve*(ventity: VEntity,
                           anchor1: Vec3[float],
                           handle1: Vec3[float],
                           handle2: Vec3[float],
-                          anchor2: Vec3[float]) =
+                          anchor2: Vec3[float]) {.inline.} =
   ventity.points.add([anchor1, handle1, handle2, anchor2])
 
 
 proc addCubicBezierCurveTo*(ventity: VEntity,
                             handle1: Vec3[float],
                             handle2: Vec3[float],
-                            anchor: Vec3[float]) =
+                            anchor: Vec3[float]) {.inline.} =
     ventity.points.add([handle1, handle2, anchor])
+
+
+proc addSmoothBezierCurveTo*(ventity: VEntity,
+                             handle2: Vec3[float],
+                             anchor: Vec3[float]) {.inline.} =
+  ventity.points.add([ventity.getReflectionOfLastHandle(), handle2, anchor])
 
 
 proc addQuadraticBezierCurveTo*(ventity: VEntity,
                                 handle: Vec3[float],
                                 anchor: Vec3[float]) {.inline.} =
-  if ventity.hasNewPathStarted():
-    ventity.points.add([handle, anchor])
-  else:
-    ventity.points.add([ventity.points[^1], handle, anchor])
+  ventity.points.add([ventity.points[^1], handle, anchor])
+
+
+proc addShortQuadraticCurveTo*(ventity: VEntity,
+                               anchor: Vec3[float]) {.inline.} =
+  ventity.addQuadraticBezierCurveTo(ventity.getReflectionOfLastHandle(), anchor)
 
 
 proc addSmoothCurveTo*(ventity: Ventity, point: Vec3[float]) =
@@ -525,10 +526,11 @@ let
 
 proc setStyle*(scene: Scene, style: Style) =
   let context = scene.context
-
   if style.fillMode != smNone:
     if style.fillColorToPatternBlend >= 1.0:
       style.fillMode = smPaintPattern
+      if style.fillColor.a == 0:
+        style.fillMode = smNone
     elif style.fillColorToPatternBlend <= 0.0:
       style.fillMode = smSolidColor
     else:
@@ -542,12 +544,15 @@ proc setStyle*(scene: Scene, style: Style) =
   of smBlend:
     context.fillColor(style.fillColor.withAlpha(1.0 - style.fillColorToPatternBlend))
   of smNone: discard
+  else: discard
 
   if style.strokeMode != smNone:
     if style.strokeColorToPatternBlend >= 1.0:
       style.strokeMode = smPaintPattern
     elif style.strokeColorToPatternBlend <= 0.0:
       style.strokeMode = smSolidColor
+      if style.strokeColor.a == 0:
+        style.strokeMode = smNone
     else:
       style.strokeMode = smBlend
 
@@ -561,6 +566,7 @@ proc setStyle*(scene: Scene, style: Style) =
   of smBlend:
     context.strokeColor(style.strokeColor.withAlpha(1.0 - style.strokeColorToPatternBlend))
   of smNone: context.strokeWidth(0.0)
+  else: discard
 
   context.pathWinding(style.winding)
   context.lineJoin(style.lineJoin)
@@ -580,6 +586,7 @@ proc executeStyle*(scene: Scene, style: Style) =
     context.fillColor(style.fillColor.withAlpha(1.0 - style.fillColorToPatternBlend))
     context.fill()
   of smNone: discard
+  else: discard
 
   case style.strokeMode:
   of smSolidColor, smPaintPattern:
@@ -590,6 +597,7 @@ proc executeStyle*(scene: Scene, style: Style) =
     context.fillColor(style.strokeColor.withAlpha(1.0 - style.fillColorToPatternBlend))
     context.stroke()
   of smNone: discard
+  else: discard
 
 
 proc applyStyle*(scene: Scene, style: Style) =
@@ -608,13 +616,35 @@ method draw*(entity: Entity, scene: Scene) {.base.} =
     context.drawPointsWithTension(entity.points, entity.tension)
   else:
     context.drawPointsWithRoundedCornerRadius(entity.points, entity.cornerRadius)
-  context.closePath()
+
+  if entity.closed:
+    context.closePath()
+
+  scene.applyStyle(entity.style)
+
+
+proc drawCubicBezierPoints*(context: NVGContext, points: seq[Vec3[float]]) =
+  context.moveTo(points[0].x, points[0].y)
+
+  for i in countup(1, high(points) - 2, pointsPerCurve):
+    let (a, b, c) = (points[i + 0], points[i + 1], points[i + 2])
+    context.bezierTo(a.x, a.y, b.x, b.y, c.x, c.y)
+
+
+method draw*(entity: VEntity, scene: Scene) =
+  let context = scene.context
+  context.beginPath()
+  context.drawCubicBezierPoints(entity.points)
+
+  if entity.closed:
+    context.closePath()
 
   scene.applyStyle(entity.style)
 
 
 proc init*(entity: Entity) =
   entity.points = @[]
+  entity.closed = true
   entity.children = @[]
   entity.tension = 0.0
   entity.cornerRadius = 20.0
@@ -639,8 +669,10 @@ let
 proc newVEntityFromPathString*(path: string): VEntity =
   new(result)
   init(result.Entity)
+  result.closed = false
+  info "Parsing " & path
 
-  let cleanPath = path.replace(pathIgnoreRegex, "")
+  let cleanPath = path.replace(pathIgnoreRegex, " ")
 
   for commandString in cleanPath.findAll(pathRegex):
     let
@@ -654,29 +686,47 @@ proc newVEntityFromPathString*(path: string): VEntity =
 
     case command:
       of 'M': # Move
-        echo "M: Move " & $args
+        info "M: Move " & $args
         result.startNewPath(vec3(args[0], args[1], 0.0))
 
-      of 'L', 'H', 'V': # Lines
-        echo command & ": Line " & $args
+      of 'L': # Lines
+        info command & ": Line " & $args
         result.addLineTo(vec3(args[0], args[1], 0.0))
+
+      of 'H': # Horizontal Lines
+        info command & ": Horizontal Line " & $args
+        result.addLineTo(vec3(args[0], result.points[^1].y, result.points[^1].z))
+
+      of 'V': # Vertical Lines
+        info command & ": Vertical Line " & $args
+        result.addLineTo(vec3(result.points[^1].x, args[0], result.points[^1].z))
 
       of 'C': # Bezier
-        echo command & ": Cubic Bezier Curve " & $args
+        info command & ": Cubic Bezier Curve " & $args
         result.addCubicBezierCurveTo(vec3(args[0], args[1], 0.0), vec3(args[2], args[3], 0.0), vec3(args[4], args[5], 0.0))
+
       of 'S': # Smooth
-        echo command & ": Smooth Curve " & $args
-        result.addLineTo(vec3(args[0], args[1], 0.0))
+        info command & ": Smooth Bezier Curve " & $args
+        result.addSmoothBezierCurveTo(vec3(args[0], args[1], 0.0), vec3(args[2], args[3], 0.0))
+
+      of 'Q': # Quad
+        info command & ": Quadratic Curve " & $args
+        result.addQuadraticBezierCurveTo(vec3(args[0], args[1], 0.0), vec3(args[2], args[3], 0.0))
+
+      of 'T': # Short Quad
+        info command & ": Short Quadratic Curve " & $args
+        result.addShortQuadraticCurveTo(vec3(args[0], args[1], 0.0))
 
       of 'A': # Arc
-        echo command & ": Arc " & $args
+        info command & ": Arc " & $args
         result.addArcTo(args[0], args[1], args[2], args[3], args[4], vec3(args[5], args[6], 0.0))
 
       of 'Z': # Close path
-        echo command & ": End " & $args
+        info command & ": End "
+        result.closePath()
 
       else:
-        echo command & ": Not Supported Yet"
+        warn command & ": Not Supported Yet"
 
 
 when isMainModule:
@@ -1058,6 +1108,26 @@ proc setTension*(entity: Entity, tension: float = 0.0): Tween {.discardable.} =
   entity.tension = endValue
 
   result = newTween(interpolators)
+
+
+proc morphPoints*(entity: Entity, points: seq[Vec3[float]]): Tween {.discardable.} =
+  var interpolators: seq[proc(t: float)]
+
+  let
+    startValue = entity.points.deepCopy()
+    endValue = points.deepCopy()
+
+  let interpolator = proc(t: float) =
+    entity.points = interpolate(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+  entity.points = endValue
+  result = newTween(interpolators)
+
+
+proc morphPoints*(entities: openArray[Entity], points: seq[Vec3[float]]): seq[Tween] {.discardable.} =
+  for entity in entities:
+    result.add(entity.morphPoints(points))
 
 
 proc setCornerRadius*(entity: Entity, cornerRadius: float = 0.0): Tween {.discardable.} =
