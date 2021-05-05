@@ -29,28 +29,49 @@ proc ventityScene(): Scene =
     testPath10 = """M 230 230
            A 45 45, 0, 1, 1, 275 275
            L 275 230 Z"""
-    testPath11 = """M 4 8 L 10 1 L 13 0 L 12 3 L 5 9 C 6 10 6 11 7 10 C 7 11 8 12 7 12 A 1.42 1.42 0 0 1 6 13 A 5 5 0 0 0 4 10 Q 3.5 9.9 3.5 10.5 T 2 11.8 T 1.2 11 T 2.5 9.5 T 3 9 A 5 5 90 0 0 0 7 A 1.42 1.42 0 0 1 1 6 C 1 5 2 6 3 6 C 2 7 3 7 4 8 M 10 1 L 10 3 L 12 3 L 10.2 2.8 L 10 1"""
+    swordPath = """M 4 8 L 10 1 L 13 0 L 12 3 L 5 9 C 6 10 6 11 7 10 C 7 11 8 12 7 12 A 1.42 1.42 0 0 1 6 13 A 5 5 0 0 0 4 10 Q 3.5 9.9 3.5 10.5 T 2 11.8 T 1.2 11 T 2.5 9.5 T 3 9 A 5 5 90 0 0 0 7 A 1.42 1.42 0 0 1 1 6 C 1 5 2 6 3 6 C 2 7 3 7 4 8 M 10 1 L 10 3 L 12 3 L 10.2 2.8 L 10 1"""
     testPath12 = """M 50 400 Q 100 250 150 300 Q 250 550 300 300 Q 350 100 400 300 C 450 550 450 50 500 400 C 550 50 550 550 600 300 A 50 50 0 1 1 700 300 Q 750 450 650 500 L 500 500 L 350 450 L 400 600 """
     testPath13="M2,2 L8,2 L2,5 L8,5 L2,8 L8,8 L12,2 l8,2 l2,5 l8,5 l2,8 l8,8"
+    testPath14="""M600,350 l 50,-25
+           a25,25 -30 0,1 50,-25 l 50,-25
+           a25,50 -30 0,1 50,-25 l 50,-25
+           a25,75 -30 0,1 50,-25 l 50,-25
+           a25,100 -30 0,1 50,-25 l 50,-25"""
+    testPath15="""M 230 80
+           A 45 45, 0, 1, 0, 275 125
+           L 275 80 Z"""
     strokeColor = rgb(256, 30, 120)
     strokeColor2 = rgb(100, 100, 200)
 
+  defaultDuration *= 1.5
+
   for y in 0..10:
     for x in 0..10:
-      var a = newVEntityFromPathString(arrowPath)
+      var a = newVEntityFromPathString(testPath15)
 
       a.moveTo(x * 100.0, y * 100.0)
-      a.stroke(strokeColor, 0.0)
-      a.fill(strokeColor)
-      a.pscale(0.4)
+      a.stroke(strokeColor, 3.0)
+      a.fill(newColor("#00000000"))
+      a.pscale(1.2)
+
+      for i in 0..high(a.points):
+        a.points[i] += vec3(-100.0, -100.0, 0.0)
 
       scene.onTrack y + x * 110:
-        a.rotate(rand(-180.0..180.0))
+        let r = rand(-180.0..180.0)
+        a.rotateTo(r)
 
         scene.sleep((x + y * 3) * 30.0)
+
+        let d = arctan2(a.position.y - 500.0, a.position.x - 500.0) - PI/2
+        scene.play(a.rotateTo(d, amRadians))
+        scene.sleep()
         scene.play(a.rotate(180))
-        scene.sleep(400)
-        scene.play(a.rotate(180))
+        scene.sleep()
+        scene.play(a.rotate(PI/4 + PI * 2, amRadians).with(duration=defaultDuration*1.5))
+        scene.sleep()
+
+        scene.play(a.rotateTo(r))
 
       scene.add(a)
 

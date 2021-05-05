@@ -880,24 +880,32 @@ let
   pathPointCache = newTable[string, seq[Vec3[float]]]()
 
 
+proc add*(entity: Entity, child: Entity) =
+  entity.children.add(child)
+
+
 proc newVEntityFromPathString*(path: string): VEntity =
   new(result)
   init(result.Entity)
   result.closed = path.toUpperAscii().contains("Z")
 
-  if pathPointCache.contains(path):
+  if pathPointCache.hasKey(path):
     result.points = pathPointCache[path].deepCopy()
     return
-
-  info "Parsing " & path
 
   let cleanPath = path.replace(pathIgnoreRegex, " ")
 
   var
     relativePoint = vec3(0.0, 0.0, 0.0)
+    stop = false
+    commandStrings = cleanPath.findAll(pathRegex)
 
-  for commandString in cleanPath.findAll(pathRegex):
+  for i in 0..high(commandStrings):
+    if stop:
+      break
+
     let
+      commandString = commandStrings[i]
       command = commandString[0]
       commandUpper = command.toUpperAscii()
       argString = commandString[1..^1].strip().splitWhitespace()
@@ -910,7 +918,18 @@ proc newVEntityFromPathString*(path: string): VEntity =
 
     case commandUpper:
       of 'M': # Move
-        info "M: Move " & $args
+        # info "M: Move " & $args
+
+        if len(result.points) > 0:
+          stop = true
+          let
+            rest = commandStrings[i..^1].join("")
+            child = newVEntityFromPathString(rest)
+
+          child.style = result.style
+          result.add(child)
+          break
+
         var point = vec3(args[0], args[1], 0.0)
 
         if isRelative:
@@ -920,7 +939,7 @@ proc newVEntityFromPathString*(path: string): VEntity =
         relativePoint = point
 
       of 'L': # Lines
-        info command & ": Line " & $args
+        # info command & ": Line " & $args
         var point = vec3(args[0], args[1], 0.0)
         if isRelative:
           point += relativePoint
@@ -929,7 +948,7 @@ proc newVEntityFromPathString*(path: string): VEntity =
         relativePoint = point
 
       of 'H': # Horizontal Lines
-        info command & ": Horizontal Line " & $args
+        # info command & ": Horizontal Line " & $args
         var point = vec3(args[0], result.points[^1].y, result.points[^1].z)
         if isRelative:
           point += relativePoint
@@ -938,7 +957,7 @@ proc newVEntityFromPathString*(path: string): VEntity =
         relativePoint = point
 
       of 'V': # Vertical Lines
-        info command & ": Vertical Line " & $args
+        # info command & ": Vertical Line " & $args
         var point = vec3(result.points[^1].x, args[0], result.points[^1].z)
         if isRelative:
           point += relativePoint
@@ -947,7 +966,7 @@ proc newVEntityFromPathString*(path: string): VEntity =
         relativePoint = point
 
       of 'C': # Bezier
-        info command & ": Cubic Bezier Curve " & $args
+        # info command & ": Cubic Bezier Curve " & $args
         var point = vec3(args[4], args[5], 0.0)
         if isRelative:
           point += relativePoint
@@ -956,7 +975,7 @@ proc newVEntityFromPathString*(path: string): VEntity =
         relativePoint = point
 
       of 'S': # Smooth
-        info command & ": Smooth Bezier Curve " & $args
+        # info command & ": Smooth Bezier Curve " & $args
         var point = vec3(args[2], args[3], 0.0)
         if isRelative:
           point += relativePoint
@@ -965,7 +984,7 @@ proc newVEntityFromPathString*(path: string): VEntity =
         relativePoint = point
 
       of 'Q': # Quad
-        info command & ": Quadratic Curve " & $args
+        # info command & ": Quadratic Curve " & $args
         var point = vec3(args[2], args[3], 0.0)
         if isRelative:
           point += relativePoint
@@ -974,7 +993,7 @@ proc newVEntityFromPathString*(path: string): VEntity =
         relativePoint = point
 
       of 'T': # Short Quad
-        info command & ": Short Quadratic Curve " & $args
+        # info command & ": Short Quadratic Curve " & $args
         var point = vec3(args[0], args[1], 0.0)
         if isRelative:
           point += relativePoint
@@ -983,7 +1002,7 @@ proc newVEntityFromPathString*(path: string): VEntity =
         relativePoint = point
 
       of 'A': # Arc
-        info command & ": Arc " & $args
+        # info command & ": Arc " & $args
         var point = vec3(args[5], args[6], 0.0)
         if isRelative:
           point += relativePoint
@@ -992,7 +1011,7 @@ proc newVEntityFromPathString*(path: string): VEntity =
         relativePoint = point
 
       of 'Z': # Close path
-        info command & ": End "
+        # info command & ": End "
         result.closePath()
 
       else:
@@ -1004,16 +1023,6 @@ proc newVEntityFromPathString*(path: string): VEntity =
     result.points[i] += vec3(-e.width/2, -e.height/2, 0.0)
 
   pathPointCache[path] = result.points.deepCopy()
-
-when isMainModule:
-  let
-    testPath = "M 230 80 A 45 45, 0, 1, 0, 275 125 L 275 80 Z"
-    testPathHeart = "M 10,30 A 20,20 0,0,1 50,30 A 20,20 0,0,1 90,30 Q 90,60 50,90 Q 10,60 10,30 z"
-    a = newVEntityFromPathString(testPath)
-
-
-proc add*(entity: Entity, child: Entity) =
-  entity.children.add(child)
 
 
 proc show*(entity: Entity): Tween {.discardable.} =

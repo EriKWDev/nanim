@@ -22,15 +22,19 @@ import
   nanim/animation,
 
   # Entities
-  nanim/entities
+  nanim/entities,
+
+  # Colors
+  nanim/colors
 
 
 export
   core,
   rendering,
   animation,
-  entities
+  entities,
+  colors
 
 # exporting these doesn't make sense in a normal library, but I can't bother importing them in every scene
-import lenientops, glm
-export lenientops, glm
+import lenientops, glm, math
+export lenientops, glm, math
