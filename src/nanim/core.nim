@@ -179,14 +179,178 @@ proc addSmoothCubicCurveTo*(ventity: VEntity,
   ventity.points.add([ventity.getReflectionOfLastHandle(), handle, point])
 
 
+func vecMag(x, y: float): float {.inline.} =
+  return sqrt(x*x + y*y)
+
+
+func vecRat(ux, uy, vx, vy: float): float {.inline.} =
+  return (ux*vx + uy*vy) / (vecMag(ux,uy) * vecMag(vx,vy))
+
+
+func vecAng(ux, uy, vx, vy: float): float =
+  var r = vecRat(ux,uy, vx,vy)
+
+  if r < -1:
+    r = -1.0
+  if r > 1:
+    r = 1.0
+
+  return (if (ux*vy < uy*vx): -1.0 else: 1.0) * arccos(r)
+
+
+func xformPoint(x, y: float, t: array[6, float]): tuple[dx, dy: float] {.inline.} =
+  return (x*t[0] + y*t[2] + t[4], x*t[1] + y*t[3] + t[5])
+
+func xformVec(x, y: float, t: array[6, float]): tuple[dx, dy: float] {.inline.} =
+  return (x*t[0] + y*t[2], x*t[1] + y*t[3])
+
+
 proc addArcTo*(ventity: VEntity,
                radiusX: float,
                radiusY: float,
                xAxisRotation: float,
                largeArcFlag: float,
                sweepFlag: float,
-               point: Vec3[float]) =
-  discard
+               endPoint: Vec3[float]) =
+
+  let
+    startPoint = ventity.points[^1]
+    delta = startPoint - endPoint
+    dist = length(delta)
+
+  var
+    rx = abs(radiusX)
+    ry = abs(radiusY)
+
+  if dist < 1e-6 or rx < 1e-6 or ry < 1e-6:
+    # The arc degenerates to a line
+    ventity.addLineTo(endPoint)
+    return
+
+  let
+    rotationX = degToRad(xAxisRotation)
+    drawLargeArc = abs(largeArcFlag) > 1e-6
+    sweepClockwise = abs(sweepFlag) > 1e-6
+    sinrx = sin(rotationX)
+    cosrx = cos(rotationX)
+
+  # Convert to center point parameterization.
+  # http://www.w3.org/TR/SVG11/implnote.html#ArcImplementationNotes
+  # 1) Compute x1', y1'
+  let
+    x1p = cosrx * delta.x / 2.0 + sinrx * delta.y / 2.0
+    y1p = -sinrx * delta.x / 2.0 + cosrx * delta.y / 2.0
+    rxSquared = rx*rx
+    rySquared = ry*ry
+    x1pSquared = x1p*x1p
+    y1pSquared = y1p*y1p
+
+  var d = (x1p*x1p)/(rxSquared) + (y1p*y1p)/(rySquared)
+
+  if (d > 1):
+    d = sqrt(d)
+    rx *= d
+    ry *= d
+
+  # 2) Compute cx', cy'
+  var
+    s = 0.0
+    sa = rxSquared*rySquared - rxSquared*y1pSquared - rySquared*x1pSquared
+    sb = rxSquared*y1pSquared + rySquared*x1pSquared
+
+  if sa < 0:
+    sa = 0
+
+  if sb > 0:
+    s = sqrt(sa / sb)
+
+  if drawLargeArc == sweepClockwise:
+    s = -s
+
+  let
+    cxp = s * rx * y1p / ry
+    cyp = s * -ry * x1p / rx
+
+  # 3) Compute cx,cy from cx',cy'
+  let
+    cx = (startPoint.x + endPoint.x)/2.0 + cosrx*cxp - sinrx*cyp
+    cy = (startPoint.y + endPoint.y)/2.0 + sinrx*cxp + cosrx*cyp
+
+  # 4) Calculate theta1, and delta theta.
+  let
+    ux = (x1p - cxp) / rx
+    uy = (y1p - cyp) / ry
+    vx = (-x1p - cxp) / rx
+    vy = (-y1p - cyp) / ry
+    a1 = vecAng(1.0, 0.0, ux, uy)  # Initial angle
+
+  var da = vecAng(ux, uy, vx, vy)    # Delta angle
+
+  # if (vecRat(ux,uy,vx,vy) <= -1.0f) da = NSVG_PI;
+  # if (vecRat(ux,uy,vx,vy) >= 1.0f) da = 0;
+
+  if sweepClockwise == false and da > 0:
+    da -= 2 * PI;
+  elif sweepClockwise == true and da < 0:
+    da += 2 * PI;
+
+  # Approximate the arc using cubic spline segments.
+  var t: array[6, float]
+
+  t[0] = cosrx
+  t[1] = sinrx
+  t[2] = -sinrx
+  t[3] = cosrx
+  t[4] = cx
+  t[5] = cy
+
+  # Split arc into max 90 degree segments.
+  # The loop assumes an iteration per end point (including start and end), this +1.
+  let
+    ndivsf = (abs(da) / (PI*0.5) + 1.0)
+    ndivs = ndivsf.int
+  var hda = (da / ndivsf) / 2.0
+
+  # Fix for ticket #179: division by 0: avoid cotangens around 0 (infinite)
+  if hda < 1e-3 and hda > -1e-3:
+    hda *= 0.5
+  else:
+    hda = (1.0f - cos(hda)) / sin(hda)
+
+  var kappa = abs(4.0 / 3.0 * hda)
+
+  if da < 0.0:
+    kappa = -kappa;
+
+  var
+    x: float
+    y: float
+    tanx: float
+    tany: float
+    px: float
+    py: float
+    ptanx: float
+    ptany: float
+
+  for i in 0..ndivs:
+    let
+      a = a1 + da * (i.float/ndivsf)
+      dx = cos(a)
+      dy = sin(a)
+
+    (x, y) = xformPoint(dx*rx, dy*ry, t)
+
+    (tanx, tany) = xformVec(-dy*rx * kappa, dx*ry * kappa, t) # tangent
+
+    if i > 0:
+      ventity.addCubicBezierCurveTo(vec3(px + ptanx, py + ptany, 0.0),
+                                    vec3(x - tanx, y - tany, 0.0),
+                                    vec3(x, y, 0.0))
+
+    px = x
+    py = y
+    ptanx = tanx
+    ptany = tany
 
 
 const
@@ -666,75 +830,6 @@ let
   pathRegex = re("[a-z][^a-z]*", {reIgnoreCase})
   pathIgnoreRegex = re(",")
 
-proc newVEntityFromPathString*(path: string): VEntity =
-  new(result)
-  init(result.Entity)
-  result.closed = false
-  info "Parsing " & path
-
-  let cleanPath = path.replace(pathIgnoreRegex, " ")
-
-  for commandString in cleanPath.findAll(pathRegex):
-    let
-      command = commandString[0]
-      argString = commandString[1..^1].strip().splitWhitespace()
-
-    var args: seq[float]
-
-    for arg in argString:
-      args.add(arg.parseFloat())
-
-    case command:
-      of 'M': # Move
-        info "M: Move " & $args
-        result.startNewPath(vec3(args[0], args[1], 0.0))
-
-      of 'L': # Lines
-        info command & ": Line " & $args
-        result.addLineTo(vec3(args[0], args[1], 0.0))
-
-      of 'H': # Horizontal Lines
-        info command & ": Horizontal Line " & $args
-        result.addLineTo(vec3(args[0], result.points[^1].y, result.points[^1].z))
-
-      of 'V': # Vertical Lines
-        info command & ": Vertical Line " & $args
-        result.addLineTo(vec3(result.points[^1].x, args[0], result.points[^1].z))
-
-      of 'C': # Bezier
-        info command & ": Cubic Bezier Curve " & $args
-        result.addCubicBezierCurveTo(vec3(args[0], args[1], 0.0), vec3(args[2], args[3], 0.0), vec3(args[4], args[5], 0.0))
-
-      of 'S': # Smooth
-        info command & ": Smooth Bezier Curve " & $args
-        result.addSmoothBezierCurveTo(vec3(args[0], args[1], 0.0), vec3(args[2], args[3], 0.0))
-
-      of 'Q': # Quad
-        info command & ": Quadratic Curve " & $args
-        result.addQuadraticBezierCurveTo(vec3(args[0], args[1], 0.0), vec3(args[2], args[3], 0.0))
-
-      of 'T': # Short Quad
-        info command & ": Short Quadratic Curve " & $args
-        result.addShortQuadraticCurveTo(vec3(args[0], args[1], 0.0))
-
-      of 'A': # Arc
-        info command & ": Arc " & $args
-        result.addArcTo(args[0], args[1], args[2], args[3], args[4], vec3(args[5], args[6], 0.0))
-
-      of 'Z': # Close path
-        info command & ": End "
-        result.closePath()
-
-      else:
-        warn command & ": Not Supported Yet"
-
-
-when isMainModule:
-  let
-    testPath = "M 230 80 A 45 45, 0, 1, 0, 275 125 L 275 80 Z"
-    testPathHeart = "M 10,30 A 20,20 0,0,1 50,30 A 20,20 0,0,1 90,30 Q 90,60 50,90 Q 10,60 10,30 z"
-    a = newVEntityFromPathString(testPath)
-
 
 type
   EntityExtents* = ref tuple
@@ -779,6 +874,131 @@ func extents*(entity: Entity): EntityExtents =
   result.center /= len(entity.points).float
   result.width = result.bottomRight.x - result.bottomLeft.x
   result.height = result.bottomLeft.y - result.topLeft.y
+
+
+proc newVEntityFromPathString*(path: string): VEntity =
+  new(result)
+  init(result.Entity)
+  result.closed = false
+  info "Parsing " & path
+
+  let cleanPath = path.replace(pathIgnoreRegex, " ")
+
+  var
+    relativePoint = vec3(0.0, 0.0, 0.0)
+
+  for commandString in cleanPath.findAll(pathRegex):
+    let
+      command = commandString[0]
+      commandUpper = command.toUpperAscii()
+      argString = commandString[1..^1].strip().splitWhitespace()
+      isRelative = command.isLowerAscii()
+
+    var args: seq[float]
+
+    for arg in argString:
+      args.add(arg.parseFloat())
+
+    case commandUpper:
+      of 'M': # Move
+        info "M: Move " & $args
+        var point = vec3(args[0], args[1], 0.0)
+
+        if isRelative:
+          point += relativePoint
+
+        result.startNewPath(point)
+        relativePoint = point
+
+      of 'L': # Lines
+        info command & ": Line " & $args
+        var point = vec3(args[0], args[1], 0.0)
+        if isRelative:
+          point += relativePoint
+
+        result.addLineTo(point)
+        relativePoint = point
+
+      of 'H': # Horizontal Lines
+        info command & ": Horizontal Line " & $args
+        var point = vec3(args[0], result.points[^1].y, result.points[^1].z)
+        if isRelative:
+          point += relativePoint
+
+        result.addLineTo(point)
+        relativePoint = point
+
+      of 'V': # Vertical Lines
+        info command & ": Vertical Line " & $args
+        var point = vec3(result.points[^1].x, args[0], result.points[^1].z)
+        if isRelative:
+          point += relativePoint
+
+        result.addLineTo(point)
+        relativePoint = point
+
+      of 'C': # Bezier
+        info command & ": Cubic Bezier Curve " & $args
+        var point = vec3(args[4], args[5], 0.0)
+        if isRelative:
+          point += relativePoint
+
+        result.addCubicBezierCurveTo(vec3(args[0], args[1], 0.0), vec3(args[2], args[3], 0.0), point)
+        relativePoint = point
+
+      of 'S': # Smooth
+        info command & ": Smooth Bezier Curve " & $args
+        var point = vec3(args[2], args[3], 0.0)
+        if isRelative:
+          point += relativePoint
+
+        result.addSmoothBezierCurveTo(vec3(args[0], args[1], 0.0), point)
+        relativePoint = point
+
+      of 'Q': # Quad
+        info command & ": Quadratic Curve " & $args
+        var point = vec3(args[2], args[3], 0.0)
+        if isRelative:
+          point += relativePoint
+
+        result.addQuadraticBezierCurveTo(vec3(args[0], args[1], 0.0), point)
+        relativePoint = point
+
+      of 'T': # Short Quad
+        info command & ": Short Quadratic Curve " & $args
+        var point = vec3(args[0], args[1], 0.0)
+        if isRelative:
+          point += relativePoint
+
+        result.addShortQuadraticCurveTo(point)
+        relativePoint = point
+
+      of 'A': # Arc
+        info command & ": Arc " & $args
+        var point = vec3(args[5], args[6], 0.0)
+        if isRelative:
+          point += relativePoint
+
+        result.addArcTo(args[0], args[1], args[2], args[3], args[4], point)
+        relativePoint = point
+
+      of 'Z': # Close path
+        info command & ": End "
+        result.closePath()
+
+      else:
+        warn command & ": Not Supported Yet"
+
+  let e = extents(result)
+
+  for i in 0..high(result.points):
+    result.points[i] += vec3(-e.width/2, -e.height/2, 0.0)
+
+when isMainModule:
+  let
+    testPath = "M 230 80 A 45 45, 0, 1, 0, 275 125 L 275 80 Z"
+    testPathHeart = "M 10,30 A 20,20 0,0,1 50,30 A 20,20 0,0,1 90,30 Q 90,60 50,90 Q 10,60 10,30 z"
+    a = newVEntityFromPathString(testPath)
 
 
 proc add*(entity: Entity, child: Entity) =
