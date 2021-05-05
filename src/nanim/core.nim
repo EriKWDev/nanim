@@ -100,7 +100,7 @@ func getReflectionOfLastHandle*(ventity: VEntity): Vec3[float] {.inline.} =
 
 
 proc startNewPath*(ventity: VEntity, point: Vec3[float]) =
-  doAssert(len(ventity.points) mod pointsPerCurve == 0)
+  # doAssert(len(ventity.points) mod pointsPerCurve == 0)
   ventity.points.add(point)
 
 
@@ -876,10 +876,19 @@ func extents*(entity: Entity): EntityExtents =
   result.height = result.bottomLeft.y - result.topLeft.y
 
 
+let
+  pathPointCache = newTable[string, seq[Vec3[float]]]()
+
+
 proc newVEntityFromPathString*(path: string): VEntity =
   new(result)
   init(result.Entity)
-  result.closed = false
+  result.closed = path.toUpperAscii().contains("Z")
+
+  if pathPointCache.contains(path):
+    result.points = pathPointCache[path].deepCopy()
+    return
+
   info "Parsing " & path
 
   let cleanPath = path.replace(pathIgnoreRegex, " ")
@@ -993,6 +1002,8 @@ proc newVEntityFromPathString*(path: string): VEntity =
 
   for i in 0..high(result.points):
     result.points[i] += vec3(-e.width/2, -e.height/2, 0.0)
+
+  pathPointCache[path] = result.points.deepCopy()
 
 when isMainModule:
   let
@@ -1669,7 +1680,8 @@ proc visualizeTracks(scene: Scene) =
   scene.scaleToUnit(compensate=true)
   let
     numberOfTracks = scene.tweenTracks.len()
-    trackHeight = min(100.0/numberOfTracks.float, 30)
+    totalTrackHeight = 180.0
+    trackHeight = min(totalTrackHeight/numberOfTracks.float, 30)
 
   var endTime: float = -1
 
