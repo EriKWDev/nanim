@@ -17,6 +17,8 @@ proc extraScene(): Scene =
   scene.wait(200)
   scene.play(entity.moveTo(500, 500))
   scene.wait(200)
+  scene.play(entity.rotate(360))
+  scene.sleep()
 
   return scene
 
@@ -26,9 +28,9 @@ proc mainScene(): Scene =
 
   for i in 1..10:
     scene.onTrack i:
-      var subScene1 = newSceneEntity(extraScene, 100, 100)
+      var subScene1 = newSceneEntity(extraScene, 100, 500)
       discard subScene1.pause()
-      discard subScene1.moveTo((i - 1) * 100.0, 500)
+      discard subScene1.moveTo((i - 1) * 100.0, 250)
       scene.add(subScene1)
 
       scene.wait(500 + i * 100.0)
