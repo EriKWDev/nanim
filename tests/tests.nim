@@ -4,7 +4,8 @@ import
   nanim,
   tables,
   utils,
-  nanovg
+  nanovg,
+  random
 
 
 suite "Scene & Entity tests":
@@ -150,6 +151,11 @@ suite "Easings, Tweens and Interpolations":
     for easingFunction in easings:
       check (easingFunction(0.0) ~= 0.0) or (easingFunction(0.0) < 0.01 and easingFunction(1.0) > -0.01)
       check (easingFunction(1.0) ~= 1.0) or (easingFunction(1.0) > 0.99 and easingFunction(1.0) < 1.01)
+      randomize()
+
+      for i in 0..100:
+        var t = rand(0.0..1.0)
+        discard easingFunction(t)
 
 
   test "Interpolations":
@@ -202,6 +208,14 @@ suite "Easings, Tweens and Interpolations":
     check interpolatedPoints10[2] ~= vec3(1.0, 1.0, 1.0)
 
 
+    var
+      points21 = @[vec3(0.0, 0.0, 0.0)]
+      points22 = @[vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0)]
+
+    check interpolate(points21, points22, 0.5)[1] ~= vec3(0.5, 0.5, 0.5)
+    check interpolate(points22, points21, 0.5)[1] ~= vec3(0.5, 0.5, 0.5)
+
+
   test "Simple Tracks":
     let scene = newScene()
     check scene.tweenTracks.len() == 1
@@ -245,8 +259,11 @@ suite "Easings, Tweens and Interpolations":
     let easings = [linear, bounceIn, smoothOvershoot, outQuad]
 
     for easing in easings:
-      let moveTween = circle.moveTo(100.0, 0).with(easing=easing)
+      let
+        goalDuration = rand(0.0..3000.0)
+        moveTween = circle.moveTo(100.0, 0).with(easing=easing, duration=goalDuration)
       check moveTween.easing == easing
+      check moveTween.duration ~= goalDuration
 
 
   test "Simple Tweens 1":

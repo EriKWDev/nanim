@@ -3,6 +3,10 @@
 *.mp4
 *.avi
 *.gif
+*.dSYM
 
 examples/renders*
 examples/daily.*
+nimcache
+lcov.info
+coverage
