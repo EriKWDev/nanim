@@ -405,7 +405,7 @@ proc clearWithColor*(color: Color = rgba(0, 0, 0, 0)) =
           GL_DEPTH_BUFFER_BIT or
           GL_STENCIL_BUFFER_BIT)
 
-
+{.push checks: off, optimization: speed.}
 proc drawPoints*(context: NVGContext, points: seq[Vec]) =
   if len(points) < 2: return
 
@@ -459,6 +459,7 @@ proc drawPointsWithRoundedCornerRadius*(context: NVGContext, points: seq[Vec], c
       p1 = p2
 
     context.arcTo(p1.x, p1.y, midPoint.x, midPoint.y, cornerRadius)
+{.pop.}
 
 var
   defaultPatternColor1* = rgb(20, 20, 20)
@@ -786,14 +787,14 @@ method draw*(entity: Entity, scene: Scene) {.base.} =
 
   scene.applyStyle(entity.style)
 
-
+{.push checks: off, optimization: speed.}
 proc drawCubicBezierPoints*(context: NVGContext, points: seq[Vec3[float]]) =
   context.moveTo(points[0].x, points[0].y)
 
   for i in countup(1, high(points) - 2, pointsPerCurve):
     let (a, b, c) = (points[i + 0], points[i + 1], points[i + 2])
     context.bezierTo(a.x, a.y, b.x, b.y, c.x, c.y)
-
+{.pop.}
 
 method draw*(entity: VEntity, scene: Scene) =
   let context = scene.context
@@ -880,9 +881,8 @@ let
   pathPointCache = newTable[string, seq[Vec3[float]]]()
 
 
-proc add*(entity: Entity, child: Entity) =
-  entity.children.add(child)
-
+proc add*(entity: Entity, children: varargs[Entity]) =
+  entity.children.add(children)
 
 proc newVEntityFromPathString*(path: string): VEntity =
   new(result)
@@ -1684,6 +1684,7 @@ let
   vizLightBlue = rgb(100, 200, 200)
   invizible = rgba(256, 100, 130, 0)
 
+{.push checks: off, optimization: speed.}
 proc visualizeTracks(scene: Scene) =
   scene.context.save()
   scene.scaleToUnit(compensate=true)
@@ -1752,7 +1753,7 @@ proc visualizeTracks(scene: Scene) =
   scene.context.fill()
 
   scene.context.restore()
-
+{.pop.}
 
 proc draw*(scene: Scene) =
   scene.context.save()
