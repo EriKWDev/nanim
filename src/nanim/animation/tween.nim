@@ -36,7 +36,7 @@ proc evaluate*(tween: Tween, time: float) =
 
   tween.execute(t)
 
-
+{.push checks: off, optimization: speed.}
 proc evaluate*(tweenTrack: TweenTrack, time: float) =
   # By first evaluating all future tweens in reverse order, then old tweens and
   # finally the current ones, we assure that all tween's have been reset and/or
@@ -67,7 +67,7 @@ proc evaluate*(tweenTrack: TweenTrack, time: float) =
 
   if len(tweenTrack.oldTweens) == len(tweenTrack.tweens) and len(tweenTrack.futureTweens) == 0 and len(tweenTrack.currentTweens) == 0:
     tweenTrack.done = true
-
+{.pop.}
 
 proc add*(tweenTrack: TweenTrack, tweens: varargs[Tween]) {.inline.} =
   tweenTrack.tweens.add(tweens)
