@@ -1,4 +1,4 @@
-import nanovg, re, tables, strutils, nanim/logging
+import nanovg, re, tables, strutils, nanim/logging, sequtils
 
 
 let colorsCache = newTable[string, Color]()
@@ -54,3 +54,7 @@ proc newColor*(cssString: string): Color =
   warn "'" & cssString & "' is not yet a supported/valid color format."
 
   return rgb(0,0,0)
+
+
+func colorsFromCoolors*(link: string): seq[Color] {.inline.} =
+  result = link.split("-").map(newColor)
