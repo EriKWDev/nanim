@@ -134,6 +134,16 @@ suite "Scene & Entity tests":
     scene.play(ts, ts, ts)
     scene.animate(ts, ts, ts)
 
+
+  test "Scene Fonts Loading Automatically Initiated":
+    let
+      scene = newScene()
+      oldFontsLen = len(scene.fontsToLoad)
+
+    scene.fontsToLoad = @[]
+    scene.loadDefaultFonts()
+    check len(scene.fontsToLoad) == oldFontsLen
+
 suite "Easings, Tweens and Interpolations":
   test "Easings":
     check linear(0.1) ~= 0.1
@@ -358,8 +368,7 @@ suite "Easings, Tweens and Interpolations":
     track.evaluate(3000.0)
     check entity.position ~= vec2(1000.0, 1000.0)
 
-
-suite "Styles":
+suite "Styles & Colors":
   test "Style Initialization":
     let style = newStyle(opacity=0.5, strokeWidth=30)
 
@@ -411,6 +420,62 @@ suite "Styles":
     style1To2Tween.execute(1.0)
     check entity.style.strokeWidth ~= 30
 
+
+  test "Color Parsing":
+    let color1 = newColor("#FFFFFFFF")
+    check color1.r ~= 1.0
+    check color1.g ~= 1.0
+    check color1.b ~= 1.0
+    check color1.a ~= 1.0
+
+    let color2 = newColor("#2c6494")
+    check color2.r * 255 ~= 44.0
+    check color2.g * 255  ~= 100.0
+    check color2.b * 255  ~= 148.0
+    check color2.a ~= 1.0
+
+    let color3 = newColor("rgb(44, 100, 148)")
+    check color3.r * 255 ~= 44.0
+    check color3.g * 255  ~= 100.0
+    check color3.b * 255  ~= 148.0
+    check color3.a ~= 1.0
+
+    let color4 = newColor("rgba(44, 100, 148, 0.5)")
+    check color4.r * 255 ~= 44.0
+    check color4.g * 255  ~= 100.0
+    check color4.b * 255  ~= 148.0
+    check color4.a ~= 0.5
+
+    let color5 = newColor("thisisnotavalidcolorformat")
+    check color5.r ~= 0.0
+    check color5.g  ~= 0.0
+    check color5.b  ~= 0.0
+    check color5.a ~= 0.0
+
+    let coolorColors1 = colorsFromCoolors("https://coolors.co/db5461-ffd9ce-593c8f-8ef9f3-171738")
+    check len(coolorColors1) == 5
+
+    let coolorColors2 = colorsFromCoolors("https://coolors.co/FFFFFF-000000")
+    check len(coolorColors2) == 2
+    check coolorColors2[0].r ~= 1.0
+    check coolorColors2[0].g ~= 1.0
+    check coolorColors2[0].b ~= 1.0
+    check coolorColors2[0].a ~= 1.0
+    check coolorColors2[1].r ~= 0.0
+    check coolorColors2[1].g ~= 0.0
+    check coolorColors2[1].b ~= 0.0
+    check coolorColors2[1].a ~= 1.0
+
+
+  test "Color Interpolation":
+    let
+      colorA = newColor("#000000")
+      colorB = newColor("#FFFFFF")
+      colorC = rgb(0.5, 0.5, 0.5)
+
+    check interpolate(colorA, colorB, 0.0) ~= colorA
+    check interpolate(colorA, colorB, 0.5) ~= colorC
+    check interpolate(colorA, colorB, 1.0) ~= colorB
 
 suite "SVG, Vector Entities and Vector Utilities":
   test "Point Equality":
