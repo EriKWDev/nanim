@@ -9,8 +9,10 @@ import
   streams,
   parseopt,
   strutils,
+  tables,
   nanim/core,
-  nanim/logging
+  nanim/logging,
+  nanim/animation
 
 
 proc createNVGContext(): NVGContext =
@@ -68,7 +70,7 @@ proc setupRendering(userScene: Scene, resizable: bool = true) =
 
   nvgInit(getProcAddress)
   scene.context = createNVGContext()
-  scene.context.loadFonts()
+  scene.loadFonts()
 
   scene.frameBufferHeight = scene.height.int32
   scene.frameBufferWidth = scene.width.int32
@@ -86,6 +88,19 @@ proc endFrame(scene: Scene) =
 
 proc runLiveRenderingLoop(scene: Scene) =
   # TODO: Make scene.update loop be on a separate thread. That would allow rendering even while user is dragging/resizing window...
+
+  var endTime: float = -1
+
+  for track in scene.tweenTracks.values:
+    let endTween = track.getLatestTween()
+    if endTween.startTime + endTween.duration > endTime:
+      endTime = endTween.startTime + endTween.duration
+
+  scene.window.cursorPositionCb =
+    proc(window: Window, pos: tuple[x, y: float64]) =
+      let (width, height) = window.size
+      scene.time = pos.x/width.float * endTime
+
   while not scene.window.shouldClose:
     scene.beginFrame()
     scene.update()
