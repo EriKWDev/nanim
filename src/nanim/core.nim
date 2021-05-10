@@ -70,6 +70,8 @@ type
     background*: proc(scene: Scene)
     foreground*: proc(scene: Scene)
 
+    fontsToLoad*: seq[tuple[name, path: string]]
+
     time*: float
     restartTime*: float
     lastTickTime*: float
@@ -1406,6 +1408,40 @@ proc fill*(scene: Scene, color: Color = rgb(255, 255, 255)) =
   scene.context.restore()
 
 
+proc loadFont*(context: NVGContext, name: string, path: string) =
+  info "Loading font '", path, "' (" & name & ")"
+  let font = context.createFont(name, path)
+  doAssert not (font == NoFont)
+
+
+proc loadFont*(scene: Scene, name: string, path: string) {.inline.} =
+  scene.fontsToLoad.add((name, path))
+
+
+proc loadFonts*(context: NVGContext, fonts: seq[tuple[name, path: string]]) =
+  for (name, path) in fonts:
+    context.loadFont(name, path)
+
+
+proc loadDefaultFonts*(scene: Scene) {.inline.} =
+  let fontFolderPath = os.joinPath(os.getAppDir(), "fonts")
+
+  var fonts: seq[tuple[name, path: string]]
+
+  for (kind, path) in fontFolderPath.walkDir():
+    let (_, name, ext) = path.splitFile()
+    case ext
+    of ".ttf":
+      fonts.add((name.toLowerAscii(), path))
+    else:
+      discard
+
+  scene.fontsToLoad.add(fonts)
+
+proc loadFonts*(scene: Scene) {.inline.} =
+  scene.context.loadFonts(scene.fontsToLoad)
+
+
 proc init(scene: Scene) =
   scene.time = 0.0
   scene.restartTime = 0.0
@@ -1425,33 +1461,12 @@ proc init(scene: Scene) =
 
   scene.background = proc(scene: Scene) = scene.fill(rgb(10, 10, 10))
   scene.foreground = proc(scene: Scene) = discard
+  scene.loadDefaultFonts()
 
 
 proc newScene*(): Scene =
   new(result)
   result.init()
-
-proc loadFont*(context: NVGContext, name: string, path: string) =
-  let font = context.createFont(name, path)
-  doAssert not (font == NoFont)
-  info "Loaded font '", path, "' (" & name & ") successfully!"
-
-
-proc loadFonts*(context: NVGContext) =
-  let fontFolderPath = os.joinPath(os.getAppDir(), "fonts")
-
-  let fonts = @[
-    ("montserrat", os.joinPath(fontFolderPath, "Montserrat-Regular.ttf")),
-    ("montserrat-thin", os.joinPath(fontFolderPath, "Montserrat-Thin.ttf")),
-    ("montserrat-light", os.joinPath(fontFolderPath, "Montserrat-Light.ttf")),
-    ("montserrat-bold", os.joinPath(fontFolderPath, "Montserrat-Bold.ttf")),
-  ]
-
-  info "Loading fonts from: " & fontFolderPath
-
-  for (name, path) in fonts:
-    context.loadFont(name, path)
-
 
 proc pscale*(scene: Scene, d: float = 0): Tween {.discardable.} =
   var interpolators: seq[proc(t: float)]
