@@ -829,10 +829,6 @@ proc newEntity*(points: seq[Vec3[float]] = @[]): Entity =
 import re, strutils
 
 
-let
-  pathRegex = re("[a-z][^a-z]*", {reIgnoreCase})
-  pathIgnoreRegex = re(",")
-
 
 type
   EntityExtents* = ref tuple
@@ -886,6 +882,11 @@ let
 proc add*(entity: Entity, children: varargs[Entity]) =
   entity.children.add(children)
 
+let
+  pathRegex = re("[a-z][^a-z]*", {reIgnoreCase})
+  pathIgnoreRegex = re(",")
+  pathMinusRegex = re("-")
+
 proc newVEntityFromPathString*(path: string): VEntity =
   new(result)
   init(result.Entity)
@@ -895,7 +896,7 @@ proc newVEntityFromPathString*(path: string): VEntity =
     result.points = pathPointCache[path].deepCopy()
     return
 
-  let cleanPath = path.replace(pathIgnoreRegex, " ")
+  let cleanPath = path.replace(pathIgnoreRegex, " ").replace(pathMinusRegex, " -")
 
   var
     relativePoint = vec3(0.0, 0.0, 0.0)
@@ -921,96 +922,110 @@ proc newVEntityFromPathString*(path: string): VEntity =
     case commandUpper:
       of 'M': # Move
         # info "M: Move " & $args
+        let point = vec3(args[0], args[1], 0.0)
+
+        if isRelative:
+          relativePoint += point
+        else:
+          relativePoint = point
+
 
         if len(result.points) > 0:
-          stop = true
+          # stop = true
           let
             rest = commandStrings[i..^1].join("")
             child = newVEntityFromPathString(rest)
 
           child.style = result.style
+
+          for i in 0..high(child.points):
+            child.points[i] -= relativePoint/2
+
           result.add(child)
           break
 
-        var point = vec3(args[0], args[1], 0.0)
 
-        if isRelative:
-          point += relativePoint
-
-        result.startNewPath(point)
-        relativePoint = point
+        result.startNewPath(relativePoint)
 
       of 'L': # Lines
         # info command & ": Line " & $args
-        var point = vec3(args[0], args[1], 0.0)
+        let point = vec3(args[0], args[1], 0.0)
         if isRelative:
-          point += relativePoint
+          relativePoint += point
+        else:
+          relativePoint = point
 
-        result.addLineTo(point)
-        relativePoint = point
+        result.addLineTo(relativePoint)
 
       of 'H': # Horizontal Lines
         # info command & ": Horizontal Line " & $args
-        var point = vec3(args[0], result.points[^1].y, result.points[^1].z)
+        let point = vec3(args[0], result.points[^1].y, result.points[^1].z)
         if isRelative:
-          point += relativePoint
+          relativePoint += point
+        else:
+          relativePoint = point
 
-        result.addLineTo(point)
-        relativePoint = point
+        result.addLineTo(relativePoint)
 
       of 'V': # Vertical Lines
         # info command & ": Vertical Line " & $args
-        var point = vec3(result.points[^1].x, args[0], result.points[^1].z)
+        let point = vec3(result.points[^1].x, args[0], result.points[^1].z)
         if isRelative:
-          point += relativePoint
+          relativePoint += point
+        else:
+          relativePoint = point
 
-        result.addLineTo(point)
-        relativePoint = point
+        result.addLineTo(relativePoint)
 
       of 'C': # Bezier
         # info command & ": Cubic Bezier Curve " & $args
-        var point = vec3(args[4], args[5], 0.0)
+        let point = vec3(args[4], args[5], 0.0)
         if isRelative:
-          point += relativePoint
+          relativePoint += point
+        else:
+          relativePoint = point
 
-        result.addCubicBezierCurveTo(vec3(args[0], args[1], 0.0), vec3(args[2], args[3], 0.0), point)
-        relativePoint = point
+        result.addCubicBezierCurveTo(vec3(args[0], args[1], 0.0), vec3(args[2], args[3], 0.0), relativePoint)
 
       of 'S': # Smooth
         # info command & ": Smooth Bezier Curve " & $args
-        var point = vec3(args[2], args[3], 0.0)
+        let point = vec3(args[2], args[3], 0.0)
         if isRelative:
-          point += relativePoint
+          relativePoint += point
+        else:
+          relativePoint = point
 
-        result.addSmoothBezierCurveTo(vec3(args[0], args[1], 0.0), point)
-        relativePoint = point
+        result.addSmoothBezierCurveTo(vec3(args[0], args[1], 0.0), relativePoint)
 
       of 'Q': # Quad
         # info command & ": Quadratic Curve " & $args
-        var point = vec3(args[2], args[3], 0.0)
+        let point = vec3(args[2], args[3], 0.0)
         if isRelative:
-          point += relativePoint
+          relativePoint += point
+        else:
+          relativePoint = point
 
-        result.addQuadraticBezierCurveTo(vec3(args[0], args[1], 0.0), point)
-        relativePoint = point
+        result.addQuadraticBezierCurveTo(vec3(args[0], args[1], 0.0), relativePoint)
 
       of 'T': # Short Quad
         # info command & ": Short Quadratic Curve " & $args
-        var point = vec3(args[0], args[1], 0.0)
+        let point = vec3(args[0], args[1], 0.0)
         if isRelative:
-          point += relativePoint
+          relativePoint += point
+        else:
+          relativePoint = point
 
-        result.addShortQuadraticCurveTo(point)
-        relativePoint = point
+        result.addShortQuadraticCurveTo(relativePoint)
 
       of 'A': # Arc
         # info command & ": Arc " & $args
-        var point = vec3(args[5], args[6], 0.0)
+        let point = vec3(args[5], args[6], 0.0)
         if isRelative:
-          point += relativePoint
+          relativePoint += point
+        else:
+          relativePoint = point
 
-        result.addArcTo(args[0], args[1], args[2], args[3], args[4], point)
-        relativePoint = point
+        result.addArcTo(args[0], args[1], args[2], args[3], args[4], relativePoint)
 
       of 'Z': # Close path
         # info command & ": End "
