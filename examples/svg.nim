@@ -62,14 +62,6 @@ proc newVEntityFromSVGFile*(path: string): VEntity =
   var x: XmlParser
   x.open(s, path)
 
-  #[
-    xmlElementStart,   ## ``<elem>``
-    xmlElementEnd,     ## ``</elem>``
-    xmlElementOpen,    ## ``<elem
-    xmlAttribute,      ## ``key = "value"`` pair
-    xmlElementClose,   ## ``>``
-  ]#
-
   while true:
     x.next()
 
