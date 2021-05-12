@@ -43,13 +43,32 @@ proc createWindow(resizable: bool = true, width: int = 900, height: int = 500): 
 
   return window
 
+proc beginFrame(scene: Scene) =
+  glViewport(0, 0, scene.frameBufferWidth, scene.frameBufferHeight)
+  scene.context.beginFrame(scene.width.cfloat, scene.height.cfloat, scene.pixelRatio)
+
+
+proc endFrame(scene: Scene) =
+  scene.context.endFrame()
+
+
+func updatePixelRatio(scene: Scene) =
+  scene.pixelRatio =  scene.width.float / scene.frameBufferWidth.float
+
 
 proc setupCallbacks(scene: Scene) =
   scene.window.framebufferSizeCb = proc(w: Window, s: tuple[w, h: int32]) =
     (scene.frameBufferWidth, scene.frameBufferHeight) = s
+    scene.updatePixelRatio()
 
-  scene.window.windowRefreshCb = proc(w: Window) =
-    (scene.width, scene.height) = w.size
+  scene.window.windowSizeCb = proc(w: Window, s: tuple[w, h: int32]) =
+    (scene.width, scene.height) = s
+    scene.updatePixelRatio()
+
+    scene.beginFrame()
+    scene.tick(0.0)
+    scene.endFrame()
+    scene.window.swapBuffers()
 
 
 proc setupRendering(userScene: Scene, resizable: bool = true) =
@@ -72,18 +91,8 @@ proc setupRendering(userScene: Scene, resizable: bool = true) =
   scene.context = createNVGContext()
   scene.loadFonts()
 
-  scene.frameBufferHeight = scene.height.int32
-  scene.frameBufferWidth = scene.width.int32
-  scene.pixelRatio = 1
-
-
-proc beginFrame(scene: Scene) =
-  glViewport(0, 0, scene.frameBufferWidth, scene.frameBufferHeight)
-  scene.context.beginFrame(scene.width.cfloat, scene.height.cfloat, scene.pixelRatio)
-
-
-proc endFrame(scene: Scene) =
-  scene.context.endFrame()
+  (scene.frameBufferWidth, scene.frameBufferHeight) = scene.window.framebufferSize
+  scene.updatePixelRatio()
 
 
 proc runLiveRenderingLoop(scene: Scene) =
