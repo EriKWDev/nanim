@@ -46,10 +46,7 @@ proc parseSVGPartStart(ventity: VEntity, name: string, attributes: TableRef[stri
           tmatches = t.findAll(translateRegex)
           (dx, dy) = (tmatches[0].parseFloat(), tmatches[1].parseFloat())
 
-        ventity.move(-dx, -dy)
-
-
-
+        ventity.pmove(-dx, -dy)
 
     else:
       echo name, ": ", attributes
