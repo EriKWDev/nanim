@@ -16,6 +16,7 @@ I have a series of animations made using nanim posted to my [Instagram Page](htt
 |--|--|--|
 |![Lots o' dots](https://user-images.githubusercontent.com/19771356/116244643-6782e100-a768-11eb-99c4-b0be68d89051.gif)|![Daily Art](https://user-images.githubusercontent.com/19771356/116244886-a2851480-a768-11eb-9d30-fb2295cbe490.gif)|![Web](https://user-images.githubusercontent.com/19771356/116245061-d6f8d080-a768-11eb-9c2e-9ce443083a37.gif)|
 
+I also post art to my [OpenSea Page](https://opensea.io/accounts/ErikWDev) where they can be bought as NFT:s.
 
 ### Usage
 Create a normal nim program where you create a Nanim Scene. This scene will carry the state of all animations and entities. Here is what a simple scene might look like:
