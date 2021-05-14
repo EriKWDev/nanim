@@ -231,13 +231,13 @@ proc renderVideoWithPipe(scene: Scene) =
   sleep(500)
 
   # ffmpeg -y -f concat -safe 0 -i './renders/parts/parts.txt' -c copy final.mp4
-  let command = "ffmpeg -y -f concat -safe 0 -loglevel warning -i " & partsFileName & " -c copy " & os.joinPath(rendersFolderPath, "final.mp4")
+  let command = "ffmpeg -y -f concat -safe 0 -loglevel warning -i " & partsFileName & " -c copy " & os.joinPath(rendersFolderPath, "final_" & $times.now().getClockStr().replace(":", "_") & ".mp4")
   info "Stitching parts together with: ", command
   discard execCmd(command)
   warn "In case the final stitching command failed, you might have to execute the command manually once all ffmpeg-processes have finished. You can check this in task manager (or by listening to your fans xP)."
 
 
-proc render*(userScene: Scene) =
+proc renderImpl*(userScene: Scene) =
   var
     scene = userScene
     createVideo = false
@@ -318,5 +318,8 @@ proc render*(userScene: Scene) =
   terminate()
 
 
+proc render*(userScene: Scene) =
+  renderImpl(userScene)
+
 proc render*(userSceneCreator: proc(): Scene) =
-  render(userSceneCreator())
+  renderImpl(userSceneCreator())

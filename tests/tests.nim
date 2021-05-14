@@ -45,6 +45,27 @@ suite "Scene & Entity tests":
     discard simpleScene()
 
 
+  test "Randomize":
+    let
+      seed = rand(0..1000)
+      scene =  newScene()
+
+
+    scene.randomize(seed)
+    let a = rand(0.0..10000.0)
+    scene.randomize(seed)
+    let b = rand(0.0..10000.0)
+    check a ~= b
+
+    scene.randomize()
+    let seed2 = rand(0..100000)
+    scene.randomize(seed2)
+    let c = rand(0.0..10000.0)
+    scene.randomize(seed2)
+    let d = rand(0.0..10000.0)
+    check a ~= b
+
+
   test "Simple Scene with Entity.rotate()":
     proc simpleScene(): Scene =
       let scene = newScene()
@@ -491,7 +512,6 @@ suite "SVG, Vector Entities and Vector Utilities":
 
     check arePointsConsideredEqual(vec3(0.0, 0.0, 0.0), vec3(0.0, toleranceForPointEquality, toleranceForPointEquality)) == false
     check arePointsConsideredEqual(vec3(0.0, 0.0, 0.0), vec3(toleranceForPointEquality, toleranceForPointEquality, toleranceForPointEquality)) == false
-
 
 suite "Other":
   test "Entity Extents":
