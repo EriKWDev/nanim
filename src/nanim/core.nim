@@ -499,7 +499,7 @@ proc gridPattern*(scene: Scene,
                   numberOfCaches: int = 1): Paint =
 
   # Impure, but worth it for the performance benefit...
-  if cache and
+  if cache == true and
     patternCache.hasKey(patternDrawer) and
     patternCache[patternDrawer].len >= numberOfCaches:
 
@@ -597,6 +597,16 @@ proc defaultPattern*(scene: Scene): Paint =
 proc noisePattern*(scene: Scene): Paint =
   scene.gridPattern(randomNoiseDrawer, 500, 500, cache = true, 50)
 
+
+proc randomize*(scene: Scene, seed: int) =
+  randomize(seed)
+  info "Random seed is: " & $seed
+
+
+proc randomize*(scene: Scene) =
+  randomize()
+  let seed = rand(0..100000000)
+  scene.randomize(seed)
 
 proc gradient*(scene: Scene, c1: Color = rgb(255, 0, 255), c2: Color = rgb(0, 0, 100)): Paint =
   result = scene.context.linearGradient(0, 0, 100, 100, c1, c2)
