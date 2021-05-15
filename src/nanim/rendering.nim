@@ -297,7 +297,7 @@ proc renderImpl*(userScene: Scene) =
         echo "    Sets width to WIDTH"
         echo "  -h:HEIGHT, --height:HEIGHT"
         echo "    Sets height to HEIGHT"
-        echo "  --debug:true, --debug:false"
+        echo "  --debug:true|false"
         echo "    Enables debug mode which will visualize the scene's tracks."
         echo "    Default behaviour is to show the visualization in live mode"
         echo "    but not in render mode."
