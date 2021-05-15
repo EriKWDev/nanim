@@ -561,14 +561,15 @@ proc randomNoiseDrawer*(scene: Scene, width: float, height: float) =
     y += ph
     x = 0.0
 
-proc randomize*(scene: Scene, seed: int) =
+proc randomize*(scene: Scene, seed: int): int {.discardable.} =
   randomize(seed)
   info "Random seed is: " & $seed
+  result = seed
 
-proc randomize*(scene: Scene) =
+proc randomize*(scene: Scene): int {.discardable.} =
   randomize()
-  let seed = rand(0..100000000)
-  scene.randomize(seed)
+  result = rand(0..100000000)
+  scene.randomize(result)
 
 
 proc defaultPattern*(scene: Scene): Paint =
