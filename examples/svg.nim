@@ -36,7 +36,7 @@ proc parseSVGPartStart(ventity: VEntity, name: string, attributes: TableRef[stri
           style.strokeMode = smSolidColor
 
         if styleTable.hasKey("stroke-width"):
-          style.strokeWidth = styleTable["stroke-width"].parseFloat()
+          style.strokeWidth = styleTable["stroke-width"].replace("mm", "").parseFloat()
 
         ventity.style = style
 
@@ -49,7 +49,7 @@ proc parseSVGPartStart(ventity: VEntity, name: string, attributes: TableRef[stri
         ventity.pmove(-dx, -dy)
 
     else:
-      echo name, ": ", attributes
+      echo name, ": ", $attributes
 
 
 proc newVEntityFromSVGFile*(path: string): VEntity =
@@ -84,12 +84,17 @@ proc newVEntityFromSVGFile*(path: string): VEntity =
 
   x.close()
 
-
 when isMainModule:
-  let p = os.joinPath(os.getAppDir(), "test.svg")
-  var a = newVEntityFromSVGFile(p)
-  a.moveTo(600, 500)
-  a.pscale(1.5)
+  let p = os.joinPath(os.getAppDir(), "test2.svg")
+  var
+    a = newVEntityFromSVGFile(p)
+    letters = flatten(a)
+
+  letters.pscale(1.5)
+  letters.fill(newColor("#aa45ff"))
+
+  for i in 0..high(letters):
+    letters[i].moveTo(i * 100.0,500)
 
   let
     scene = newScene()
@@ -97,6 +102,6 @@ when isMainModule:
 
   scene.background = proc(scene: Scene) = scene.fill(bg)
 
-  scene.add(a)
+  scene.add(letters)
 
   render(scene)

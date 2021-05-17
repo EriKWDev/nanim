@@ -437,7 +437,7 @@ proc drawPointsWithRoundedCornerRadius*(context: NVGContext, points: seq[Vec], c
 {.pop.}
 
 var
-  defaultPatternColor1* = rgb(20, 20, 20)
+  defaultPatternColor1* = rgb(60, 60, 60)
   defaultPatternColor2* = rgb(20, 20, 20)
 
 
@@ -457,6 +457,30 @@ proc defaultPatternDrawer*(scene: Scene, width: float, height: float) =
 
   context.fillColor(defaultPatternColor1)
   context.fill()
+
+proc stripedPatternDrawer*(scene: Scene, width: float, height: float) =
+  let context = scene.context
+
+  context.beginPath()
+  context.rect(0, 0, width, height)
+  context.closePath()
+
+  context.fillColor(defaultPatternColor2)
+  context.fill()
+
+  let
+    N = 20
+    d = height/N.float
+
+  context.beginPath()
+  for i in 0..N:
+    context.moveTo(-width, i.float * d)
+    context.lineTo(width*2, i.float * d)
+  context.closePath()
+
+  context.strokeColor(defaultPatternColor1)
+  context.strokeWidth(5)
+  context.stroke()
 
 
 proc offset(some: pointer; b: int): pointer {.inline.} =
@@ -577,6 +601,9 @@ proc defaultPattern*(scene: Scene): Paint =
 
 proc noisePattern*(scene: Scene): Paint =
   scene.gridPattern(randomNoiseDrawer, 500, 500, cache = true, 50)
+
+proc stripedPattern*(scene: Scene): Paint =
+  scene.gridPattern(stripedPatternDrawer, 300, 300)
 
 proc gradient*(scene: Scene, c1: Color = rgb(255, 0, 255), c2: Color = rgb(0, 0, 100)): Paint =
   result = scene.context.linearGradient(0, 0, 100, 100, c1, c2)
@@ -858,10 +885,19 @@ let pathPointCache = newTable[string, seq[Vec3[float]]]()
 proc add*(entity: Entity, children: varargs[Entity]) =
   entity.children.add(children)
 
+proc flatten*(entity: Entity): seq[Entity] =
+  for child in entity.children:
+    result &= flatten(child)
+
+  entity.children = @[]
+  result.insert(entity, 0)
+
+
 let
   pathRegex = re("[a-z][^a-z]*", {reIgnoreCase})
   pathIgnoreRegex = re(",")
   pathMinusRegex = re("-")
+  mmRegex = re("mm")
 
 proc newVEntityFromPathString*(path: string): VEntity =
   new(result)
@@ -1224,6 +1260,29 @@ proc fill*(entity: Entity, fillColor: Color): Tween {.discardable.} =
 proc fill*(entities: openArray[Entity], fillColor: Color): seq[Tween] {.discardable.} =
   for i in 0..high(entities):
     result.add(entities[i].fill(fillColor))
+
+proc fill*(entity: Entity, fillPattern: proc(scene: Scene): Paint): Tween {.discardable.} =
+  var interpolators: seq[proc(t: float)]
+
+  let
+    startValue = entity.style.fillPattern.deepCopy()
+    endValue = fillPattern
+    startBlend = entity.style.fillColorToPatternBlend.deepCopy()
+
+  let interpolator = proc(t: float) =
+    entity.style.fillColorToPatternBlend = interpolate(startBlend, 1.0, t)
+    entity.style.fillPattern = eitherOrInterpolation(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+
+  entity.style = entity.style.copyWith(fillPattern=endValue, fillMode=smPaintPattern)
+
+  result = newTween(interpolators)
+
+proc fill*(entities: openArray[Entity], fillPattern: proc(scene: Scene): Paint): seq[Tween] {.discardable.} =
+  for i in 0..high(entities):
+    result.add(entities[i].fill(fillPattern))
+
 
 
 proc stroke*(entity: Entity, strokeColor: Color, strokeWidth: float = entity.style.strokeWidth): Tween {.discardable.} =
