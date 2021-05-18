@@ -47,6 +47,7 @@ proc evaluate*(tweenTrack: TweenTrack, time: float) =
 
   for i in 0..high(tweenTrack.tweens):
     let tween = tweenTrack.tweens[i]
+
     if time > tween.startTime + tween.duration:
       tweenTrack.oldTweens.add(tween)
     elif time < tween.startTime:
@@ -73,21 +74,19 @@ proc add*(tweenTrack: TweenTrack, tweens: varargs[Tween]) {.inline.} =
   tweenTrack.tweens.add(tweens)
 
 
-proc init(tween: Tween, interpolators: seq[proc(t: float)], easing: Easing, duration: float) =
+proc init(tween: Tween, interpolators: seq[proc(t: float)], easing: Easing = defaultEasing, duration: float) =
   tween.interpolators = interpolators
   tween.easing = easing
   tween.duration = duration
   tween.startTime = 0
 
 
-proc newTween*(interpolators: seq[proc(t: float)], easing: proc(t: float): float = defaultEasing, duration: float = defaultDuration): Tween =
+func newTween*(interpolators: seq[proc(t: float)], easing: Easing = defaultEasing, duration: float = defaultDuration): Tween =
   new(result)
-  result.init(interpolators,
-              easing,
-              duration)
+  result.init(interpolators, easing, duration)
 
 
-proc with*(base: Tween, duration=base.duration, easing=base.easing, startTime=base.startTime, interpolators=base.interpolators): Tween =
+func with*(base: Tween, duration=base.duration, easing: Easing = base.easing, startTime=base.startTime, interpolators=base.interpolators): Tween =
   new(result)
   result.duration = duration
   result.easing = easing
@@ -95,17 +94,17 @@ proc with*(base: Tween, duration=base.duration, easing=base.easing, startTime=ba
   result.interpolators = interpolators
 
 
-proc copyWith*(base: Tween, duration=base.duration, easing=base.easing, startTime=base.startTime, interpolators=base.interpolators): Tween {.inline.} =
+proc copyWith*(base: Tween, duration=base.duration, easing: Easing = base.easing, startTime=base.startTime, interpolators=base.interpolators): Tween {.inline.} =
   with(base, defaultDuration, easing, startTime, interpolators)
 
 
-func with*(bases: openArray[Tween], duration=defaultDuration, easing=defaultEasing): seq[Tween] =
+func with*(bases: openArray[Tween], duration=defaultDuration, easing: Easing = defaultEasing): seq[Tween] =
   result = newSeq[Tween]()
   for base in bases:
     result.add(base.with(duration, easing))
 
 
-func with*(bases: openArray[seq[Tween]], duration=defaultDuration, easing=defaultEasing): seq[Tween] =
+func with*(bases: openArray[seq[Tween]], duration=defaultDuration, easing: Easing = defaultEasing): seq[Tween] =
   result = newSeq[Tween]()
   for base in bases:
     result.add(base.with(duration, easing))

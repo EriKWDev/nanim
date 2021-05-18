@@ -9,19 +9,20 @@ import
   nanovg
 
 
-type Easing* = proc(t: float): float
+type Easing* = proc(t: float): float {.noSideEffect.}
 
 
-func linear*(t: float): float = return t
+func linear*(t: float): float = t
 
-func inQuad*(t: float): float = return pow(t, 4.0)
-func outQuad*(t: float): float = return 1.0 - inQuad(t - 1.0)
+func inQuad*(t: float): float = pow(t, 4.0)
+func outQuad*(t: float): float = 1.0 - inQuad(t - 1.0)
 
-func inExpo*(t: float): float = return pow(t, 2.0)
-func outExpo*(t: float): float = return 1.0 - inExpo(t - 1.0)
+func inExpo*(t: float): float = pow(t, 2.0)
+func outExpo*(t: float): float = 1.0 - inExpo(t - 1.0)
 
 # from https://stats.stackexchange.com/questions/214877/is-there-a-formula-for-an-s-shaped-curve-with-domain-and-range-0-1
-func sigmoid*(t: float, n: float): float = return 1.0/(1.0 + pow(t/(1.0 - t), -abs(n)))
+func sigmoid*(t: float, n: float): float =
+  1.0/(1.0 + pow(t/(1.0 - t), -abs(n)))
 
 func sigmoid2*(t: float): float = sigmoid(t, 2.0)
 func sigmoid3*(t: float): float = sigmoid(t, 3.0)
@@ -45,25 +46,23 @@ func easeOutElastic*(t: float): float =
 
   return pow(2.0, -10 * t) * sin((t * 10 - 0.75) * c4) + 1.0
 
-proc eitherOrInterpolation*[T](fromValue: T, toValue: T, t: float): T =
+func eitherOrInterpolation*[T](fromValue: T, toValue: T, t: float): T =
   return if t < 0.5: fromValue else: toValue
 
 
-proc interpolate*[V](fromValue: V, toValue: V, t: float): V =
+func interpolate*[V](fromValue: V, toValue: V, t: float): V =
   return fromValue + t * (toValue - fromValue)
 
 
-proc interpolate*(fromValue: bool, toValue: bool, t: float): bool =
+func interpolate*(fromValue: bool, toValue: bool, t: float): bool =
   eitherOrInterpolation(fromValue, toValue, t)
 
 
-proc interpolate*(fromValue: int, toValue: int, t: float): int =
+func interpolate*(fromValue: int, toValue: int, t: float): int =
   interpolate(fromValue.float, toValue.float, t).int
 
 
-proc interpolatePointsOfSameSize*(fromValue: seq[Vec3[float]],
-                                  toValue: seq[Vec3[float]],
-                                  t: float): seq[Vec3[float]] =
+func interpolatePointsOfSameSize*(fromValue: seq[Vec3[float]], toValue: seq[Vec3[float]], t: float): seq[Vec3[float]] =
   result = newSeq[Vec3[float]](len(fromValue))
 
   let fromTo = zip(fromValue, toValue)
@@ -73,9 +72,7 @@ proc interpolatePointsOfSameSize*(fromValue: seq[Vec3[float]],
 
 # Interpolation of sequence of points
 # TODO: Make sequences of differing size interpolate well too (somehow...)
-proc interpolate*(fromValue: seq[Vec3[float]],
-                  toValue: seq[Vec3[float]],
-                  t: float): seq[Vec3[float]] =
+func interpolate*(fromValue: seq[Vec3[float]], toValue: seq[Vec3[float]], t: float): seq[Vec3[float]] =
   let
     lf = len(fromValue)
     lt = len(toValue)
@@ -90,15 +87,15 @@ proc interpolate*(fromValue: seq[Vec3[float]],
     return interpolatePointsOfSameSize(fromValue[0..^2], toValue, t) & interpolate(toValue[^1], fromValue[^1], t)
 
 
-proc interpolate*(fromValue: Color, toValue: Color, t: float): Color =
+func interpolate*(fromValue: Color, toValue: Color, t: float): Color =
   lerp(fromValue, toValue, t)
 
-proc interpolate*(fromValue: Paint, toValue: Paint, t: float): Paint =
+func interpolate*(fromValue: Paint, toValue: Paint, t: float): Paint =
   eitherOrInterpolation(fromValue, toValue, t)
 
 
 # Can use https://cubic-bezier.com/ to create nice curves
-func cubicBezier*(t: float = 0.0, cpx1, cpy1, cpx2, cpy2: float): float =
+func cubicBezier*(t = 0.0, cpx1, cpy1, cpx2, cpy2: float): float  =
   let
     controlPoint1 = vec2(min(1.0, max(0.0, cpx1)), cpy1)
     controlPoint2 = vec2(min(1.0, max(0.0, cpx2)), cpy2)

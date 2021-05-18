@@ -77,6 +77,8 @@ type
     lastTickTime*: float
     deltaTime*: float
 
+    secretRenderingNumber*: int
+
     frameBufferWidth*: int32
     frameBufferHeight*: int32
 
@@ -1525,6 +1527,7 @@ proc init(scene: Scene) =
   scene.background = proc(scene: Scene) = scene.fill(rgb(10, 10, 10))
   scene.foreground = proc(scene: Scene) = discard
   scene.loadDefaultFonts()
+  scene.secretRenderingNumber = 60
 
 proc newScene*(): Scene =
   new(result)
