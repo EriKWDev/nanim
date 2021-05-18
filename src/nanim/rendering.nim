@@ -204,7 +204,7 @@ proc renderVideoWithPipe(scene: Scene) =
     swapBuffers(scene.window)
 
     try:
-      if n > 60:
+      if n > scene.secretRenderingNumber:
         restartFFMPeg(i)
         n = 0
 
@@ -256,6 +256,11 @@ proc renderImpl*(userScene: Scene) =
       of "v", "video", "render":
         createVideo = true
         scene.debug = false
+      of "secret":
+        scene.secretRenderingNumber = value.parseInt()
+      of "s", "size":
+        scene.width = value.parseInt()
+        scene.height = value.parseInt()
       of "w", "width":
         scene.width = value.parseInt()
       of "h", "height":
