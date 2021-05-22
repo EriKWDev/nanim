@@ -22,8 +22,10 @@ proc createNVGContext(): NVGContext =
 
 proc createWindow(resizable: bool = true, width: int = 900, height: int = 500): Window =
   var config = DefaultOpenglWindowConfig
+  let tag = if resizable: "(Preview, hover with mouse to jump around)" else: "(Rendering)"
+
   config.size = (w: width, h: height)
-  config.title = "Nanim"
+  config.title = "Nanim " & tag
   config.resizable = resizable
   config.nMultiSamples = 8
   config.debugContext = true
@@ -302,6 +304,12 @@ proc renderImpl*(userScene: Scene) =
         echo "    Sets width to WIDTH"
         echo "  -h:HEIGHT, --height:HEIGHT"
         echo "    Sets height to HEIGHT"
+        echo "  -s:SIZE, --size:SIZE"
+        echo "    Sets both width andd height to SIZE"
+        echo "  --secret:VALUE"
+        echo "    Sets the secret rendering value. 'Restarts FFMpeg every VALUE frame'"
+        echo "    Default value is set to 60 and should work for most scenes. Lower in"
+        echo "    case a complex or high resolution scene fails to render."
         echo "  --debug:true|false"
         echo "    Enables debug mode which will visualize the scene's tracks."
         echo "    Default behaviour is to show the visualization in live mode"
