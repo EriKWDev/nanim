@@ -1601,10 +1601,11 @@ proc switchTrack*(scene: Scene, newTrackId: int = defaultTrackId) =
   discard scene.tweenTracks.hasKeyOrPut(newTrackId, newTweenTrack())
 
 template onTrack*(scene: Scene, trackId: int = defaultTrackId, body: untyped): untyped =
-  let oldTrackId = scene.currentTweenTrackId
-  scene.switchTrack(trackId)
-  body
-  scene.switchTrack(oldTrackId)
+  block:
+    let oldTrackId = scene.currentTweenTrackId
+    scene.switchTrack(trackId)
+    body
+    scene.switchTrack(oldTrackId)
 
 template ignoreTrack*(scene: Scene, trackId: int = defaultTrackId, body: untyped): untyped =
   when defined(release):
