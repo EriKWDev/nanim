@@ -23,12 +23,12 @@ type
 
 var defaultDuration*: float = 1100.0
 
-proc execute*(tween: Tween, t: float) {.inline.} =
+method execute*(tween: Tween, t: float) {.inline, base.} =
   for interpolator in tween.interpolators:
     interpolator(t)
 
 
-proc evaluate*(tween: Tween, time: float) =
+method evaluate*(tween: Tween, time: float) {.base.} =
   let t = if tween.duration <= 0:
       1.0
     else:
