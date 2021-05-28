@@ -1078,7 +1078,6 @@ proc show*(entities: openArray[Entity]): seq[Tween] {.discardable.} =
 
 
 proc move*(entity: Entity, dx: float = 0.0, dy: float = 0.0, dz: float = 0.0): Tween {.discardable.} =
-
   var interpolators: seq[proc(t: float)]
   let delta = vec3(dx, dy, dz)
 
@@ -1100,13 +1099,91 @@ proc move*(entities: openArray[Entity], dx: float = 0.0, dy: float = 0.0, dz: fl
     result.add(entities[i].move(dx, dy, dz))
 
 
-proc moveTo*(entity: Entity, dx: float = 0.0,  dy: float = 0.0, dz: float = 0.0): Tween {.discardable.} =
+proc moveX*(entity: Entity, dx: float = 0.0): Tween {.discardable.} =
+  var interpolators: seq[proc(t: float)]
+
+  let
+    startValue = entity.position.x.deepCopy()
+    endValue = startValue + dx
+
+  let interpolator = proc(t: float) =
+    entity.position.x = interpolate(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+
+  entity.position.x = endValue
+
+  result = newTween(interpolators)
+
+proc moveX*(entities: openArray[Entity], dx: float = 0.0): seq[Tween] {.discardable.} =
+  for i in 0..high(entities):
+    result.add(entities[i].moveX(dx))
+
+proc moveY*(entity: Entity, dy: float = 0.0): Tween {.discardable.} =
+  var interpolators: seq[proc(t: float)]
+
+  let
+    startValue = entity.position.y.deepCopy()
+    endValue = startValue + dy
+
+  let interpolator = proc(t: float) =
+    entity.position.y = interpolate(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+
+  entity.position.y = endValue
+
+  result = newTween(interpolators)
+
+proc moveY*(entities: openArray[Entity], dy: float = 0.0): seq[Tween] {.discardable.} =
+  for i in 0..high(entities):
+    result.add(entities[i].moveY(dy))
+
+proc moveZ*(entity: Entity, dz: float = 0.0): Tween {.discardable.} =
+  var interpolators: seq[proc(t: float)]
+
+  let
+    startValue = entity.position.z.deepCopy()
+    endValue = startValue + dz
+
+  let interpolator = proc(t: float) =
+    entity.position.z = interpolate(startValue, endValue, t)
+
+  interpolators.add(interpolator)
+
+  entity.position.z = endValue
+
+  result = newTween(interpolators)
+
+proc moveZ*(entities: openArray[Entity], dz: float = 0.0): seq[Tween] {.discardable.} =
+  for i in 0..high(entities):
+    result.add(entities[i].moveY(dz))
+
+
+proc moveLeft*(entity: Entity, d: float = 0.0): Tween {.discardable, inline.} = entity.moveX(-d)
+
+proc moveLeft*(entities: openArray[Entity], d: float = 0.0): seq[Tween] {.discardable, inline.} = entities.moveX(-d)
+
+proc moveRight*(entity: Entity, d: float = 0.0): Tween {.discardable, inline.} = entity.moveX(d)
+
+proc moveRight*(entities: openArray[Entity], d: float = 0.0): seq[Tween] {.discardable, inline.} = entities.moveX(d)
+
+proc moveUp*(entity: Entity, d: float = 0.0): Tween {.discardable, inline.} = entity.moveY(-d)
+
+proc moveUp*(entities: openArray[Entity], d: float = 0.0): seq[Tween] {.discardable, inline.} = entities.moveY(-d)
+
+proc moveDown*(entity: Entity, d: float = 0.0): Tween {.discardable, inline.} = entity.moveY(d)
+
+proc moveDown*(entities: openArray[Entity], d: float = 0.0): seq[Tween] {.discardable, inline.} = entities.moveY(d)
+
+
+proc moveTo*(entity: Entity, x: float = 0.0,  y: float = 0.0, z: float = 0.0): Tween {.discardable.} =
 
   var interpolators: seq[proc(t: float)]
 
   let
     startValue = entity.position.deepCopy()
-    endValue = vec3(dx, dy, dz)
+    endValue = vec3(x, y, z)
 
   let interpolator = proc(t: float) =
     entity.position = interpolate(startValue, endValue, t)
