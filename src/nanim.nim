@@ -36,5 +36,5 @@ export
   colors
 
 # exporting these doesn't make sense in a normal library, but I can't bother importing them in every scene
-import lenientops, glm, math
-export lenientops, glm, math
+import lenientops, glm, math, random
+export lenientops, glm, math, random

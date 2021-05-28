@@ -352,6 +352,40 @@ suite "Easings, Tweens and Interpolations":
     tween1.execute(0)
     check entity.position ~= vec2(100.0, 100.0)
 
+  test "Simple Tweens 3":
+    let entity = newHeptagon()
+
+    entity.moveTo(0, 0)
+    entity.moveX(100)
+    check entity.position ~= vec2(100.0, 0.0)
+
+    entity.moveTo(0, 0)
+    entity.moveRight(100)
+    check entity.position ~= vec2(100.0, 0.0)
+
+    entity.moveTo(0, 0)
+    entity.moveLeft(100)
+    check entity.position ~= vec2(-100.0, 0.0)
+
+    entity.moveTo(0, 0)
+    entity.moveLeft(100)
+    check entity.position ~= vec2(-100.0, 0.0)
+
+    entity.moveTo(0, 0)
+    entity.moveY(100)
+    check entity.position ~= vec2(0.0, 100.0)
+
+    entity.moveTo(0, 0)
+    entity.moveDown(100)
+    check entity.position ~= vec2(0.0, 100.0)
+
+    entity.moveTo(0, 0)
+    entity.moveY(-100)
+    check entity.position ~= vec2(0.0, -100.0)
+
+    entity.moveTo(0, 0)
+    entity.moveUp(100)
+    check entity.position ~= vec2(0.0, -100.0)
 
   test "Track Evaluation":
     var
