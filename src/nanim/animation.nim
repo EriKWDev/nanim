@@ -1,6 +1,7 @@
 
 import
   nanim/animation/easings,
-  nanim/animation/tween
+  nanim/animation/tween,
+  nanim/animation/animations
 
-export easings, tween
+export easings, tween, animations
