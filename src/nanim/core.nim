@@ -336,6 +336,18 @@ const
   defaultAngleMode*: AngleMode = amDegrees
 
 
+func parseAngleToRad*(angle: float = 0.0, mode: AngleMode = defaultAngleMode): float =
+  result = case mode:
+    of amDegrees: math.degToRad(angle)
+    of amRadians: angle
+
+
+func parseAngleToDeg*(angle: float = 0.0, mode: AngleMode = defaultAngleMode): float =
+  result = case mode:
+    of amDegrees: angle
+    of amRadians: math.radToDeg(angle)
+
+
 proc `$`*(entity: Entity): string =
   result =
     "entity\n" &
