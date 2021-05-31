@@ -7,7 +7,8 @@ import
   nanim/entities/scene_entity,
   nanim/entities/point,
   nanim/entities/line,
-  nanim/entities/polygon
+  nanim/entities/polygon,
+  nanim/entities/arc
 
 
-export circle, rectangle, text, engon, scene_entity, point, line, polygon
+export circle, rectangle, text, engon, scene_entity, point, line, polygon, arc
