@@ -220,6 +220,28 @@ proc moveTo*(entities: openArray[Entity], dx: float = 0.0, dy: float = 0.0, dz: 
     result.add(entities[i].moveTo(dx, dy, dz))
 
 
+proc moveThrough*(entity: Entity, points: openArray[Vec3[float]]): Tween {.discardable.} =
+  var interpolators: seq[proc(t: float)]
+
+  let
+    startValue = entity.position.deepCopy()
+    endValue = points[^1]
+    actualPoints = @[startValue] & points.toSeq()
+
+  let interpolator = proc(t: float) =
+    entity.position = bezierInterpolation(actualPoints, t)
+
+  interpolators.add(interpolator)
+
+  entity.position = endValue
+
+  result = newTween(interpolators)
+
+proc moveThrough*(entities: openArray[Entity], points: openArray[Vec3[float]]): seq[Tween] {.discardable.} =
+  for i in 0..high(entities):
+    result.add(entities[i].moveThrough(points))
+
+
 proc stretch*(entity: Entity, dx: float = 1.0, dy: float = 1.0, dz: float = 1.0): Tween {.discardable.} =
 
   var interpolators: seq[proc(t: float)]

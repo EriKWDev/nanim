@@ -93,6 +93,34 @@ func interpolate*(fromValue: Color, toValue: Color, t: float): Color =
 func interpolate*(fromValue: Paint, toValue: Paint, t: float): Paint =
   eitherOrInterpolation(fromValue, toValue, t)
 
+import tables, hashes
+
+var bezierCache: Table[Hash, Vec3[float]]
+
+proc bezierInterpolation*(points: openArray[Vec3[float]], t: float): Vec3[float] =
+  var h: Hash = 0
+  let N = 1000000.0
+
+  for point in points:
+    h = h !& (point.x * N).toInt() !& (point.y * N).toInt() !& (point.z * N).toInt()
+  h = h !& (t * N).toInt()
+
+  h = !$h
+
+  if bezierCache.hasKey(h):
+    return bezierCache[h]
+
+  if len(points) == 1:
+    bezierCache[h] = points[0]
+  else:
+    let
+      p1 = bezierInterpolation(points[0..^2], t)
+      p2 = bezierInterpolation(points[1..^1], t)
+      nt = 1.0 - t
+
+    bezierCache[h] = nt * p1 + t * p2
+
+  return bezierCache[h]
 
 # Can use https://cubic-bezier.com/ to create nice curves
 func cubicBezier*(t = 0.0, cpx1, cpy1, cpx2, cpy2: float): float  =
