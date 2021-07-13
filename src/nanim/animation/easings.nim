@@ -14,6 +14,14 @@ type Easing* = proc(t: float): float {.noSideEffect.}
 
 func linear*(t: float): float = t
 
+func inPow*(power: float): Easing =
+  return func(t: float): float {.noSideEffect.} =
+    return pow(t, power)
+
+func outPow*(power: float): Easing =
+  return func(t: float): float {.noSideEffect.} =
+    return 1.0 - pow(t - 1.0, power)
+
 func inQuad*(t: float): float = pow(t, 4.0)
 func outQuad*(t: float): float = 1.0 - inQuad(t - 1.0)
 
