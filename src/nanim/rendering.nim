@@ -122,8 +122,6 @@ proc setupRendering(userScene: Scene, resizable: bool = true) =
   if init() == 0:
     raise newException(Exception, "Failed to Initialize GLFW")
 
-
-
   scene.window = createWindow(resizable, scene.width, scene.height)
   if resizable: scene.setupCallbacks()
 
@@ -131,11 +129,6 @@ proc setupRendering(userScene: Scene, resizable: bool = true) =
 
   # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
   loadExtensions()
-  when not defined(Windows):
-    glEnable(GL_MULTISAMPLE)
-    glEnable(GL_BLEND)
-    glEnable(GL_STENCIL_TEST)
-    glEnable(GL_BACK)
 
   nvgInit(getProcAddress)
   scene.context = createNVGContext()
