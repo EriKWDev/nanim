@@ -16,7 +16,7 @@ import
 
 
 proc createNVGContext(): NVGContext =
-  let flags = {nifStencilStrokes, nifDebug, nifAntialias}
+  let flags = {nifStencilStrokes, nifDebug}
   return nvgCreateContext(flags)
 
 
@@ -25,19 +25,32 @@ proc createWindow(resizable: bool = true, width: int = 900, height: int = 500): 
     tag = if resizable: "(Preview, hover with mouse to jump around)" else: "(Rendering)"
     title = "Nanim " & tag
 
-  let window = createWindow(width.cint, height.cint, title, nil, nil)
+  defaultWindowHints()
 
-  # config.size = (w: width, h: height)
-  # config.title = "Nanim " & tag
-  # config.resizable = resizable
-  # config.nMultiSamples = 8
-  # config.debugContext = true
-  # config.bits = (r: 8, g: 8, b: 8, a: 8, stencil: 8, depth: 16)
+  windowHint(SAMPLES, 8)
+
+  windowHint(OPENGL_DEBUG_CONTEXT, TRUE)
+
+  windowHint(RED_BITS, 8)
+  windowHint(GREEN_BITS, 8)
+  windowHint(BLUE_BITS, 8)
+  windowHint(ALPHA_BITS, 8)
+
+  windowHint(STENCIL_BITS, 8)
+  windowHint(DEPTH_BITS, 16)
+
+  windowHint(DECORATED, TRUE)
+
+  windowHint(RESIZABLE, if resizable: TRUE else: FALSE)
 
   when defined(MacOS) or defined(MacOSX):
-    config.version = glv32
-    config.forwardCompat = true
-    config.profile = opCoreProfile
+    windowHint(VERSION_MAJOR, 3)
+    windowHint(VERSION_MINOR, 2)
+    windowHint(OPENGL_FORWARD_COMPAT, TRUE)
+    windowHint(OPENGL_PROFILE, OPENGL_CORE_PROFILE)
+
+  let window = createWindow(width.cint, height.cint, title, nil, nil)
+
 
   if window == nil: quit(-1)
 
@@ -60,17 +73,31 @@ func updatePixelRatio(scene: Scene) =
   scene.pixelRatio =  scene.width.float / scene.frameBufferWidth.float
 
 
-proc setupCallbacks(scene: Scene) {.cdecl.} =
-  let frameBufferSizeCallback =
-    proc(window: Window, width: cint, height: cint) {.cdecl.} =
+template get(f: untyped): bool {.dirty.} =
+  var win {.inject.} = gWindowTable.getOrDefault(handle)
+  var cb {.inject.} = if not win.isNil: win.f else: nil
+
+  not cb.isNil
+
+var
+  frameBufferSizeCallback: proc(window: Window, width: cint, height: cint) {.closure.}
+  windowSizeCallBack: proc(window: Window, width: cint, height: cint) {.closure.}
+
+proc setupCallbacks(scene: Scene) =
+  frameBufferSizeCallback =
+    proc(window: Window, width: cint, height: cint) {.closure.} =
       scene.frameBufferWidth = width
       scene.frameBufferHeight = height
       scene.updatePixelRatio()
 
-  discard scene.window.setFramebufferSizeCallback(frameBufferSizeCallback)
-
-  let windowSizeCallBack =
+  let frameBufferSizeCallbackC =
     proc(window: Window, width: cint, height: cint) {.cdecl.} =
+      frameBufferSizeCallback(window, width, height)
+
+  discard scene.window.setFramebufferSizeCallback(frameBufferSizeCallbackC)
+
+  windowSizeCallBack =
+    proc(window: Window, width: cint, height: cint) {.closure.} =
       scene.width = width
       scene.height = height
       scene.updatePixelRatio()
@@ -80,7 +107,11 @@ proc setupCallbacks(scene: Scene) {.cdecl.} =
       scene.endFrame()
       scene.window.swapBuffers()
 
-  discard scene.window.setWindowSizeCallback(windowSizeCallBack)
+  let windowSizeCallBackC =
+    proc(window: Window, width: cint, height: cint) {.cdecl.} =
+      windowSizeCallBack(window, width, height)
+
+  discard scene.window.setWindowSizeCallback(windowSizeCallBackC)
 
 
 proc setupRendering(userScene: Scene, resizable: bool = true) =
@@ -111,6 +142,8 @@ proc setupRendering(userScene: Scene, resizable: bool = true) =
   scene.updatePixelRatio()
 
 
+var cursorPositionCallback: proc(window: Window, x, y: cdouble) {.closure.}
+
 proc runLiveRenderingLoop(scene: Scene) =
   # TODO: Make scene.update loop be on a separate thread. That would allow rendering even while user is dragging/resizing window...
 
@@ -121,8 +154,8 @@ proc runLiveRenderingLoop(scene: Scene) =
     if endTween.startTime + endTween.duration > endTime:
       endTime = endTween.startTime + endTween.duration
 
-  let cursorPositionCallback =
-    proc(window: Window, x, y: cdouble) =
+  cursorPositionCallback =
+    proc(window: Window, x, y: cdouble) {.closure.} =
       var
         width: cint
         height: cint
@@ -131,7 +164,11 @@ proc runLiveRenderingLoop(scene: Scene) =
 
       scene.time = x/width.float * endTime
 
-  # discard scene.window.setCursorPosCallback(cursorPositionCallback)
+  let cursorPositionCallbackC =
+    proc(window: Window, x, y: cdouble) {.cdecl.} =
+      cursorPositionCallback(window, x, y)
+
+  discard scene.window.setCursorPosCallback(cursorPositionCallbackC)
 
   # Compensate for the time it took to get here
   scene.time = scene.time - getCurrentRealTime()
