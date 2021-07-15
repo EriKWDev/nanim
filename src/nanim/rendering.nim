@@ -46,6 +46,8 @@ proc createWindow(resizable: bool = true, width: int = 900, height: int = 500): 
   when defined(MacOS) or defined(MacOSX):
     windowHint(VERSION_MAJOR, 3)
     windowHint(VERSION_MINOR, 2)
+    windowHint(CONTEXT_VERSION_MAJOR, 3)
+    windowHint(CONTEXT_VERSION_MINOR, 2)
     windowHint(OPENGL_FORWARD_COMPAT, TRUE)
     windowHint(OPENGL_PROFILE, OPENGL_CORE_PROFILE)
 
