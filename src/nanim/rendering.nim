@@ -16,7 +16,7 @@ import
 
 
 proc createNVGContext(): NVGContext =
-  let flags = {nifStencilStrokes, nifDebug}
+  let flags = {nifStencilStrokes, nifDebug, nifAntialias}
   return nvgCreateContext(flags)
 
 
@@ -122,24 +122,25 @@ proc setupRendering(userScene: Scene, resizable: bool = true) =
   if init() == 0:
     raise newException(Exception, "Failed to Initialize GLFW")
 
+
+
   scene.window = createWindow(resizable, scene.width, scene.height)
   if resizable: scene.setupCallbacks()
 
-  loadExtensions()
-
-  glEnable(GL_MULTISAMPLE)
-  glEnable(GL_BLEND)
-  glEnable(GL_STENCIL_TEST)
-  glEnable(GL_BACK)
-  # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
   scene.window.makeContextCurrent()
+
+  # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+  loadExtensions()
+  when not defined(Windows):
+    glEnable(GL_MULTISAMPLE)
+    glEnable(GL_BLEND)
+    glEnable(GL_STENCIL_TEST)
+    glEnable(GL_BACK)
 
   nvgInit(getProcAddress)
   scene.context = createNVGContext()
   scene.loadFonts()
 
-  # (scene.frameBufferWidth, scene.frameBufferHeight) = scene.window.framebufferSize
   scene.window.getFramebufferSize(scene.frameBufferWidth.addr, scene.frameBufferHeight.addr)
   scene.updatePixelRatio()
 
