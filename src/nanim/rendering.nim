@@ -1,7 +1,7 @@
 
 import
   nanovg,
-  glfw,
+  staticglfw,
   opengl,
   os,
   times,
@@ -16,27 +16,44 @@ import
 
 
 proc createNVGContext(): NVGContext =
-  let flags = {nifStencilStrokes, nifDebug}
+  let flags = {nifStencilStrokes, nifDebug, nifAntialias}
   return nvgCreateContext(flags)
 
 
 proc createWindow(resizable: bool = true, width: int = 900, height: int = 500): Window =
-  var config = DefaultOpenglWindowConfig
-  let tag = if resizable: "(Preview, hover with mouse to jump around)" else: "(Rendering)"
+  let
+    tag = if resizable: "(Preview, hover with mouse to jump around)" else: "(Rendering)"
+    title = "Nanim " & tag
 
-  config.size = (w: width, h: height)
-  config.title = "Nanim " & tag
-  config.resizable = resizable
-  config.nMultiSamples = 8
-  config.debugContext = true
-  config.bits = (r: 8, g: 8, b: 8, a: 8, stencil: 8, depth: 16)
+  defaultWindowHints()
+
+  windowHint(SAMPLES, 8)
+
+  windowHint(OPENGL_DEBUG_CONTEXT, TRUE)
+
+  windowHint(RED_BITS, 8)
+  windowHint(GREEN_BITS, 8)
+  windowHint(BLUE_BITS, 8)
+  windowHint(ALPHA_BITS, 8)
+
+  windowHint(STENCIL_BITS, 8)
+  windowHint(DEPTH_BITS, 16)
+
+  windowHint(DECORATED, TRUE)
+
+  windowHint(RESIZABLE, if resizable: TRUE else: FALSE)
 
   when defined(MacOS) or defined(MacOSX):
-    config.version = glv32
-    config.forwardCompat = true
-    config.profile = opCoreProfile
+    windowHint(VERSION_MAJOR, 3)
+    windowHint(VERSION_MINOR, 2)
+    windowHint(CONTEXT_VERSION_MAJOR, 3)
+    windowHint(CONTEXT_VERSION_MINOR, 2)
+    windowHint(OPENGL_FORWARD_COMPAT, TRUE)
+    windowHint(OPENGL_PROFILE, OPENGL_CORE_PROFILE)
 
-  let window = newWindow(config)
+  let window = createWindow(width.cint, height.cint, title, nil, nil)
+
+
   if window == nil: quit(-1)
 
   # Enables vsync
@@ -58,44 +75,77 @@ func updatePixelRatio(scene: Scene) =
   scene.pixelRatio =  scene.width.float / scene.frameBufferWidth.float
 
 
+template get(f: untyped): bool {.dirty.} =
+  var win {.inject.} = gWindowTable.getOrDefault(handle)
+  var cb {.inject.} = if not win.isNil: win.f else: nil
+
+  not cb.isNil
+
+var
+  frameBufferSizeCallback: proc(window: Window, width: cint, height: cint) {.closure.}
+  windowSizeCallBack: proc(window: Window, width: cint, height: cint) {.closure.}
+
 proc setupCallbacks(scene: Scene) =
-  scene.window.framebufferSizeCb = proc(w: Window, s: tuple[w, h: int32]) =
-    (scene.frameBufferWidth, scene.frameBufferHeight) = s
-    scene.updatePixelRatio()
+  frameBufferSizeCallback =
+    proc(window: Window, width: cint, height: cint) {.closure.} =
+      scene.frameBufferWidth = width
+      scene.frameBufferHeight = height
+      scene.updatePixelRatio()
 
-  scene.window.windowSizeCb = proc(w: Window, s: tuple[w, h: int32]) =
-    (scene.width, scene.height) = s
-    scene.updatePixelRatio()
+  let frameBufferSizeCallbackC =
+    proc(window: Window, width: cint, height: cint) {.cdecl.} =
+      frameBufferSizeCallback(window, width, height)
 
-    scene.beginFrame()
-    scene.tick(0.0)
-    scene.endFrame()
-    scene.window.swapBuffers()
+  discard scene.window.setFramebufferSizeCallback(frameBufferSizeCallbackC)
+
+  windowSizeCallBack =
+    proc(window: Window, width: cint, height: cint) {.closure.} =
+      scene.width = width
+      scene.height = height
+      scene.updatePixelRatio()
+
+      scene.beginFrame()
+      scene.tick(0.0)
+      scene.endFrame()
+      scene.window.swapBuffers()
+
+  let windowSizeCallBackC =
+    proc(window: Window, width: cint, height: cint) {.cdecl.} =
+      windowSizeCallBack(window, width, height)
+
+  discard scene.window.setWindowSizeCallback(windowSizeCallBackC)
 
 
 proc setupRendering(userScene: Scene, resizable: bool = true) =
   var scene = userScene
-  initialize()
+
+  if init() == 0:
+    raise newException(Exception, "Failed to Initialize GLFW")
+
+
+
   scene.window = createWindow(resizable, scene.width, scene.height)
   if resizable: scene.setupCallbacks()
 
-  doAssert glInit()
+  scene.window.makeContextCurrent()
 
-  glEnable(GL_MULTISAMPLE)
-  glEnable(GL_BLEND)
-  glEnable(GL_STENCIL_TEST)
-  glEnable(GL_BACK)
   # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-  makeContextCurrent(scene.window)
+  loadExtensions()
+  when not defined(Windows):
+    glEnable(GL_MULTISAMPLE)
+    glEnable(GL_BLEND)
+    glEnable(GL_STENCIL_TEST)
+    glEnable(GL_BACK)
 
   nvgInit(getProcAddress)
   scene.context = createNVGContext()
   scene.loadFonts()
 
-  (scene.frameBufferWidth, scene.frameBufferHeight) = scene.window.framebufferSize
+  scene.window.getFramebufferSize(scene.frameBufferWidth.addr, scene.frameBufferHeight.addr)
   scene.updatePixelRatio()
 
+
+var cursorPositionCallback: proc(window: Window, x, y: cdouble) {.closure.}
 
 proc runLiveRenderingLoop(scene: Scene) =
   # TODO: Make scene.update loop be on a separate thread. That would allow rendering even while user is dragging/resizing window...
@@ -107,12 +157,26 @@ proc runLiveRenderingLoop(scene: Scene) =
     if endTween.startTime + endTween.duration > endTime:
       endTime = endTween.startTime + endTween.duration
 
-  scene.window.cursorPositionCb =
-    proc(window: Window, pos: tuple[x, y: float64]) =
-      let (width, height) = window.size
-      scene.time = pos.x/width.float * endTime
+  cursorPositionCallback =
+    proc(window: Window, x, y: cdouble) {.closure.} =
+      var
+        width: cint
+        height: cint
 
-  while not scene.window.shouldClose:
+      window.getWindowSize(width.addr, height.addr)
+
+      scene.time = x/width.float * endTime
+
+  let cursorPositionCallbackC =
+    proc(window: Window, x, y: cdouble) {.cdecl.} =
+      cursorPositionCallback(window, x, y)
+
+  discard scene.window.setCursorPosCallback(cursorPositionCallbackC)
+
+  # Compensate for the time it took to get here
+  scene.time = scene.time - getCurrentRealTime()
+
+  while scene.window.windowShouldClose() == 0:
     scene.beginFrame()
     scene.update()
     scene.endFrame()
@@ -120,12 +184,17 @@ proc runLiveRenderingLoop(scene: Scene) =
     swapBuffers(scene.window)
     pollEvents()
 
-  scene.window.destroy()
+  scene.window.destroyWindow()
 
 
 proc renderVideoWithPipe(scene: Scene) =
+  var
+    width: cint
+    height: cint
+
+  scene.window.getWindowSize(width.addr, height.addr)
+
   let
-    (width, height) = scene.window.size
     rgbaSize = sizeof(cint)
     bufferSize: int = width * height * rgbaSize
     goalFps = 60
@@ -217,14 +286,14 @@ proc renderVideoWithPipe(scene: Scene) =
       scene.done = true
 
     if scene.done:
-      scene.window.shouldClose = true
+      scene.window.setWindowShouldClose(1)
 
     pollEvents()
 
   partsFile.flushFile()
   partsFile.close()
   dealloc(data)
-  scene.window.destroy()
+  scene.window.destroyWindow()
   closeFFMpeg()
 
   # By sleeping just a little bit it seems that the file is really
@@ -323,8 +392,6 @@ proc renderImpl*(userScene: Scene) =
   if createVideo:
     scene.renderVideoWithPipe()
   else:
-    # Compensate for the time it took to get here
-    scene.time = scene.time - (cpuTime() * 1000.0)
     scene.runLiveRenderingLoop()
 
   nvgDeleteContext(scene.context)

@@ -81,7 +81,7 @@ when isMainModule:
 
 ```
 
-The scene can then be run by simply compiling the file like so: `nim c -d:glfwStaticLib -r <file_containing_scene>.nim`. Once your scene is compiled, you can run it either in "live" mode (default), which opens a window and renders the scene in realtime, or you can render it to a video by supplying `--render` after your call to the binary. Here are all the options (keep in mind that it is the last option(s) supplied that takes priority over others):
+The scene can then be run by simply compiling the file like so: `nim c -r <file_containing_scene>.nim`. Once your scene is compiled, you can run it either in "live" mode (default), which opens a window and renders the scene in realtime, or you can render it to a video by supplying `--render` after your call to the binary. Here are all the options (keep in mind that it is the last option(s) supplied that takes priority over others):
 ```
 Options:
   -r, --run

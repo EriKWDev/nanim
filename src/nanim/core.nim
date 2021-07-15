@@ -2,7 +2,7 @@
 import
   glm,
   hashes,
-  glfw,
+  staticglfw,
   tables,
   nanovg,
   sequtils,
@@ -1377,7 +1377,7 @@ proc visualizeTracks(scene: Scene) =
   scene.context.fill()
 
   scene.context.restore()
-{.pop.}
+
 
 proc draw*(scene: Scene) =
   scene.context.save()
@@ -1405,6 +1405,12 @@ proc draw*(scene: Scene) =
   if scene.debug:
     scene.visualizeTracks()
 
+{.pop.}
+
+
+proc getCurrentRealTime*(): float =
+  epochTime() * 1000.0
+
 
 proc tick*(scene: Scene, deltaTime: float = 1000.0/120.0) =
   scene.deltaTime = deltaTime
@@ -1419,12 +1425,12 @@ proc tick*(scene: Scene, deltaTime: float = 1000.0/120.0) =
 
   scene.draw()
 
-  scene.lastTickTime = cpuTime() * 1000
+  scene.lastTickTime = getCurrentRealTime()
 
 
 proc update*(scene: Scene) =
   let
-    time = cpuTime() * 1000.0
+    time = getCurrentRealTime()
     goalDelta = 1000.0/120.0
     delta = time - scene.lastTickTime
 
