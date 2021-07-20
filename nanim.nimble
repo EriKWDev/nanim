@@ -13,5 +13,5 @@ skipDirs      = @["examples"]
 requires "nim >= 1.4.2"
 requires "staticglfw >= 4.1.3"
 requires "glm >= 1.1.0"
-requires "https://github.com/johnnovak/nim-nanovg#dc5fe1f13f17746ff1687871506056ef6be8c8da"
+requires "nanovg >= 0.3.2"
 requires "rainbow >= 0.2.0"
