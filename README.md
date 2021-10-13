@@ -21,6 +21,9 @@ I have a series of animations made using nanim posted to my [Instagram Page](htt
 
 I also post art to my [OpenSea Page](https://opensea.io/accounts/ErikWDev) where they can be bought as NFT:s.
 
+### Installation
+Currently, do `git clone git@github.com:EriKWDev/nanim.git --depth=1`, `cd nanim` and finally `nimble install`. Once installed, you can add the optional dependency ffmpeg. For debian/ubuntu that would be `sudo apt install ffmpeg`. This allows you to render your animations to videos using `--render`. Run one of the examples using `nim c -r examples/example_001.nim`!
+
 ### Usage
 Create a normal nim program where you create a Nanim Scene. This scene will carry the state of all animations and entities. This is what the bare minimum looks like:
 ```nim
@@ -40,11 +43,22 @@ when isMainModule:
 
 But that's not very fun! Let's add some animation! Here is what a simple scene might look like:
 ```nim
+# example.nim
+
 import nanim
 
 proc testScene(): Scene =
   # Creates a scene-state
   let scene = newScene()
+
+  # You can load some nice colors from a palette on coolors.co!
+  var colors = colorsFromCoolors("https://coolors.co/33658a-86bbd8-758e4f-f6ae2d-f26419")
+  scene.randomize() # randomize the seed of the scene
+
+  colors.shuffle()
+  let bg = colors[0]
+  colors.del(0)
+  scene.setBackgroundColor(bg)
 
   var
     text = newText("Hello, World!", font="montserrat-thin")
@@ -52,6 +66,11 @@ proc testScene(): Scene =
 
   # We must add our entities to the scene in order for them to be drawn
   scene.add(rect, text)
+
+  # Set some colors!
+  text.fill(colors[1])
+  rect.fill(colors[2])
+  rect.stroke(colors[3], 4.0)
 
   # By discarding tweens, we can "set" values without animating the change
   discard text.move(150, 150)
@@ -127,7 +146,7 @@ Options:
 Remember that the rendering to video requires [FFMpeg](https://www.ffmpeg.org/) to be installed and available in your `PATH`.
 
 ### Legal
- - The majority[1] of the source for this project is release under the MIT license. See the `LICENSE` file for details on what this means for distribution.
+ - The majority[1] of the source for this project is released under the MIT license. See the `LICENSE` file for details on what this means for distribution. All source currently in this repository is free.
  - The Montserrat font families used in the examples in the `examples/fonts` directory are used under the OFL and are subject to copyright by The Montserrat Project Authors (https://github.com/JulietaUla/Montserrat). See `examples/fonts/OFL.txt`
  - This project has no association with 3b1b nor ManimCommunity's `manim`, but is indeed inspired by it.
 

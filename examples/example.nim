@@ -4,12 +4,26 @@ proc testScene(): Scene =
   # Creates a scene-state
   let scene = newScene()
 
+  # You can load some nice colors from a palette on coolors.co!
+  var colors = colorsFromCoolors("https://coolors.co/33658a-86bbd8-758e4f-f6ae2d-f26419")
+  scene.randomize() # randomize the seed of the scene
+
+  colors.shuffle()
+  let bg = colors[0]
+  colors.del(0)
+  scene.setBackgroundColor(bg)
+
   var
     text = newText("Hello, World!", font="montserrat-thin")
     rect = newSquare()
 
   # We must add our entities to the scene in order for them to be drawn
   scene.add(rect, text)
+
+  # Set some colors!
+  text.fill(colors[1])
+  rect.fill(colors[2])
+  rect.stroke(colors[3], 4.0)
 
   # By discarding tweens, we can "set" values without animating the change
   discard text.move(150, 150)
