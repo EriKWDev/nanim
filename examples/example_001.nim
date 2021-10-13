@@ -1,76 +1,62 @@
-
 import nanim
 
-
-proc testScene(): Scene =
+proc daily068Scene(): Scene =
   let scene = newScene()
 
-  var circle1 = newCircle(60)
-  var circle2 = newCircle(160)
-  var engon1 = newHexagon()
-  var text = newText("Hello, World!")
-  var textBox = newTextBox("Lorem ipsum dolor sit amet, conceduar los palmos allit", 1000)
-  var rect = newSquare()
+  var colors = colorsFromCoolors("https://coolors.co/33658a-86bbd8-758e4f-f6ae2d-f26419")
+  scene.randomize()
 
-  scene.add(circle1, circle2, rect, engon1, text, textBox)
+  defaultDuration = 2400.0
 
-  discard circle1.move(150, 150)
-  discard text.move(150, 150)
-  discard engon1.move(10, 20)
-  discard textBox.move(500, 700)
+  colors.shuffle()
+  let bg = colors[0]
+  colors.del(0)
+  scene.setBackgroundColor(bg)
 
-  scene.wait(200)
-  scene.showAllEntities()
-  scene.wait(500)
-  scene.play(text.setFontSize(10), textBox.setFontSize(2))
 
-  scene.play(engon1.move(500, 500))
-  scene.play(engon1.fadeTo(0.4))
-  scene.play(text.fadeOut(), textBox.setFontSize())
-  scene.play(textBox.paint(noisePaint))
-  scene.play(engon1.fadeOut())
-  scene.play(engon1.fadeIn())
-  scene.play(engon1.setCornerRadius(20), engon1.scale(2))
-  scene.play(engon1.setCornerRadius(1))
-  scene.play(engon1.setTension(0.4))
-  scene.play(engon1.setTension(0))
-  scene.play(engon1.scale(1/2), engon1.pscale(2))
+  let
+    N = 15
+    d = 1000.0/N
+    s = 0
 
-  scene.play(circle1.move(200, 200),
-             circle2.move(500, 200),
-             text.moveTo(500, 500),
-             rect.move(100, 500),
-             rect.rotate(45))
+  defaultEasing = linear
 
-  scene.play(circle1.pscale(5),
-             circle2.scale(2),
-             rect.pscale(3))
+  var i = 0
+  for y in s..N-s:
+    var color = colors[y mod len(colors)]
+    for x in s..N-s:
+      inc i
 
-  scene.play(rect.setTension(0.6))
+      let even2 = x mod 2 == 0
 
-  scene.wait(500)
+      let a = newArc(d/2, 0.0, 180.0)
 
-  scene.play(circle1.pscale(1/5),
-             circle2.scale(1/2),
-             rect.pscale(1/3))
+      a.fill(newColor("#00000000"))
+      a.stroke(color, d/10.0)
+      a.moveTo(x * d, y * d)
+      scene.add(a)
 
-  # scene.startHere() # ! start animation here
+      if not even2:
+        a.rotate(180)
+        a.stretch(-1)
 
-  scene.play(rect.setTension(0), rect.rotate(360*2), rect.pscale(4))
 
-  scene.wait(500)
-  scene.play(engon1.rotate(180))
+      scene.onTrack i:
+        for _ in 0..3:
+          if even2:
+            scene.play(a.endAngleTo(0), a.fadeOut())
+            scene.play([a.endAngleTo(180), a.startAngleTo(180), a.fadeIn()].with(duration=0))
+            scene.play(a.startAngleTo(0))
+          else:
+            scene.play([a.endAngleTo(180), a.startAngleTo(180), a.fadeIn()].with(duration=0))
+            scene.play(a.startAngleTo(0))
+            scene.play(a.endAngleTo(0), a.fadeOut())
 
-  scene.play(rect.move(600), rect.setCornerRadius(30))
-
-  for i in 0..5:
-    scene.play(rect.move(-20),
-              rect.rotate(-300),
-              rect.pscale(if i mod 2 == 0: 1.0/10.0 else: 10.0))
-
-  scene.wait(500)
 
   return scene
 
+when isMainModule:
+  # for _ in 0..10:
+  #   render(daily068Scene)
 
-when isMainModule: render(testScene)
+  render(daily068Scene)

@@ -5,6 +5,9 @@
   <img src="https://github.com/EriKWDev/nanim/actions/workflows/unittests_devel.yaml/badge.svg?branch=main">
 </p>
 
+<p align="center">
+  Tested and works on:<br/>Linux | Windows | MacOS
+</p>
 
 ### About
 Nanim is an easy-to-use framework to create smooth GPU-accelerated animations that can be previewed live inside a glfw window and, when ready, rendered to videos at an arbitrary resolution and framerate.
@@ -19,7 +22,23 @@ I have a series of animations made using nanim posted to my [Instagram Page](htt
 I also post art to my [OpenSea Page](https://opensea.io/accounts/ErikWDev) where they can be bought as NFT:s.
 
 ### Usage
-Create a normal nim program where you create a Nanim Scene. This scene will carry the state of all animations and entities. Here is what a simple scene might look like:
+Create a normal nim program where you create a Nanim Scene. This scene will carry the state of all animations and entities. This is what the bare minimum looks like:
+```nim
+import nanim
+
+
+proc testScene(): Scene =
+  let scene = newScene()
+
+  return scene
+
+
+when isMainModule:
+  render(testScene)
+```
+
+
+But that's not very fun! Let's add some animation! Here is what a simple scene might look like:
 ```nim
 import nanim
 
@@ -78,10 +97,11 @@ when isMainModule:
   # Finally, call render to render our scene.
   # render(testScene()) works as well.
   render(testScene)
-
 ```
 
-The scene can then be run by simply compiling the file like so: `nim c -r <file_containing_scene>.nim`. Once your scene is compiled, you can run it either in "live" mode (default), which opens a window and renders the scene in realtime, or you can render it to a video by supplying `--render` after your call to the binary. Here are all the options (keep in mind that it is the last option(s) supplied that takes priority over others):
+The scenes can then be run by simply compiling the file like so: `nim c -r <file_containing_scene>.nim`. Once your scene is compiled, you can run it either in "live" mode (default), which opens a window and renders the scene in realtime where you can scrub around with your mouse and resize the window at will. That, or you can render it to a video by supplying `--render` with a specified `--size:<size>` after. (Make Sure `ffmpeg` is installed for this to work!).
+
+Here are all the options (keep in mind that it is the last option(s) supplied that takes priority over others):
 ```
 Options:
   -r, --run
