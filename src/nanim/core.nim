@@ -761,33 +761,36 @@ proc setStyle*(scene: Scene, style: Style) =
   context.globalCompositeOperation(style.compositeOperation)
   context.globalAlpha(style.opacity)
 
-proc executeStyle*(scene: Scene, style: Style) =
+proc executeStyle*(scene: Scene, style: Style, doFill=true, doStroke=true) =
   let context = scene.context
-  case style.fillMode:
-  of smSolidColor, smPaintPattern:
-    context.fill()
-  of smBlend:
-    context.fillPaint(style.fillPattern(scene))
-    context.fill()
-    context.fillColor(style.fillColor.withAlpha(1.0 - style.fillColorToPatternBlend))
-    context.fill()
-  of smNone: discard
-  else: discard
 
-  case style.strokeMode:
-  of smSolidColor, smPaintPattern:
-    context.stroke()
-  of smBlend:
-    context.fillPaint(style.strokePattern(scene))
-    context.stroke()
-    context.fillColor(style.strokeColor.withAlpha(1.0 - style.fillColorToPatternBlend))
-    context.stroke()
-  of smNone: discard
-  else: discard
+  if doFill:
+    case style.fillMode:
+    of smSolidColor, smPaintPattern:
+      context.fill()
+    of smBlend:
+      context.fillPaint(style.fillPattern(scene))
+      context.fill()
+      context.fillColor(style.fillColor.withAlpha(1.0 - style.fillColorToPatternBlend))
+      context.fill()
+    of smNone: discard
+    else: discard
 
-proc applyStyle*(scene: Scene, style: Style) =
+  if doStroke:
+    case style.strokeMode:
+    of smSolidColor, smPaintPattern:
+      context.stroke()
+    of smBlend:
+      context.fillPaint(style.strokePattern(scene))
+      context.stroke()
+      context.fillColor(style.strokeColor.withAlpha(1.0 - style.fillColorToPatternBlend))
+      context.stroke()
+    of smNone: discard
+    else: discard
+
+proc applyStyle*(scene: Scene, style: Style, doFill=true, doStroke=true) =
   scene.setStyle(style)
-  scene.executeStyle(style)
+  scene.executeStyle(style, doFill, doStroke)
 
 
 method draw*(entity: Entity, scene: Scene) {.base.} =

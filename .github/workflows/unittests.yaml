@@ -24,6 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Update apt
+        run: sudo apt update --fix-missing
+
       - name: Install Dependencies
         run: sudo apt install libxcursor-dev xorg-dev
 

@@ -33,6 +33,4 @@ method draw*(line: Line, scene: Scene) =
   context.beginPath()
   context.moveTo(line.points[0].x, line.points[0].y)
   context.lineTo(line.points[1].x, line.points[1].y)
-  context.closePath()
-
-  scene.applyStyle(line.style)
+  scene.applyStyle(line.style, doFill=false, doStroke=true)
