@@ -9,6 +9,7 @@ import
   streams,
   parseopt,
   strutils,
+  strformat,
   tables,
   nanim/core,
   nanim/logging,
@@ -75,12 +76,6 @@ proc endFrame(scene: Scene) =
 func updatePixelRatio(scene: Scene) =
   scene.pixelRatio =  scene.width.float / scene.frameBufferWidth.float
 
-
-template get(f: untyped): bool {.dirty.} =
-  var win {.inject.} = gWindowTable.getOrDefault(handle)
-  var cb {.inject.} = if not win.isNil: win.f else: nil
-
-  not cb.isNil
 
 var
   frameBufferSizeCallback: proc(window: Window, width: cint, height: cint) {.closure.}
@@ -181,7 +176,7 @@ proc runLiveRenderingLoop(scene: Scene) =
   scene.window.destroyWindow()
 
 
-proc renderVideoWithPipe(scene: Scene) =
+proc renderWithPipe(scene: Scene, createGif = false) =
   var
     width: cint
     height: cint
@@ -195,12 +190,32 @@ proc renderVideoWithPipe(scene: Scene) =
     goalDeltaTime = 1000.0/goalFps.float
 
     rendersFolderPath = os.joinPath(os.getAppDir(), "renders")
-    filePath = joinPath(rendersFolderPath, "final_" & $times.now().getClockStr().replace(":", "_") & ".mp4")
+    filePath = joinPath(rendersFolderPath, "final_" & $times.now().getClockStr().replace(":", "_"))
 
   createDir(rendersFolderPath)
 
-  # * ffmpeg -y -f rawvideo -pix_fmt rgba -s 1920x1080 -r 60 -i - -vf vflip -an -c:v libx264 -preset fast -crf 18 -tune animation -pix_fmt yuv444p
-  let
+  var ffmpegOptions: seq[string]
+
+  if createGif:
+    warn "Currently, the built in GIF-generation is very primitive. It is recommended to instead use --render and manually convert the render to GIF for better results."
+    ffmpegOptions = @[
+      "-y",
+      "-f", "rawvideo",
+      "-pix_fmt", "rgba",
+      "-s", $width & "x" & $height,
+      "-r", $goalFps,
+      "-i", "-", # * Set input to pipe
+      "-vf", "vflip",  # * Flips the image vertically since glReadPixels gives flipped image
+      "-an",  # * Don't expect audio
+      # "-loglevel", "panic",
+      # TODO: Get palettegen and scales to work. Current GIFs are huge
+      # "-filter_complex",
+      # [0:v] split [a][b];[a] palettegen [p];[b][p] paletteuse'",
+      # """[0]fps=15,scale=576:-1,setsar=1[x];[x][1:v]paletteuse""",
+      filePath & ".gif"
+    ]
+  else:
+    # * ffmpeg -y -f rawvideo -pix_fmt rgba -s 1920x1080 -r 60 -i - -vf vflip -an -c:v libx264 -preset medium -profile:v high -crf 17 -coder 1 -tune animation -pix_fmt yuv420p -movflags +faststart -g 30 -bf 2 final-mp4
     ffmpegOptions = @[
       "-y",
       "-f", "rawvideo",
@@ -209,7 +224,7 @@ proc renderVideoWithPipe(scene: Scene) =
       "-r", $goalFps,
       "-i", "-", # * Set input to pipe
       "-vf", "vflip", # * Flips the image vertically since glReadPixels gives flipped image
-      "-an",  # * Don't expect audio,
+      "-an",  # * Don't expect audio
       # "-loglevel", "panic",
       "-c:v", "libx264",  # * H.264 encoding
       "-preset", "medium",  # * Should probably stay at fast/medium later
@@ -221,20 +236,21 @@ proc renderVideoWithPipe(scene: Scene) =
       "-movflags", "+faststart",
       "-g", "30",
       "-bf", "2",
-      filePath
+      filePath & ".mp4"
     ]
+
 
   var
     ffmpegProcess: Process
     data = alloc(bufferSize)
 
 
-  proc writeToFFMpeg(info: pointer, size: int) =
+  proc writeToFFmpeg(info: pointer, size: int) =
     ffmpegProcess.inputStream().writeData(info, size)
     ffmpegProcess.inputStream().flush()
 
-  stdout.write InfoPrefix, "Launching FFMpeg subprocess with: "
-  ffmpegProcess = startProcess("ffmpeg", "", ffmpegOptions, options = {poUsePath, poEchoCmd})
+  stdout.write InfoPrefix, "Launching FFmpeg subprocess with: "
+  ffmpegProcess = startProcess("ffmpeg", "", ffmpegOptions, options = {poUsePath, poEchoCmd, poStdErrToStdOut})
 
   while not scene.done:
     scene.beginFrame()
@@ -248,7 +264,7 @@ proc renderVideoWithPipe(scene: Scene) =
     swapBuffers(scene.window)
 
     try:
-      writeToFFMpeg(data, bufferSize)
+      writeToFFmpeg(data, bufferSize)
     except:
       let msg = getCurrentExceptionMsg()
       error msg
@@ -264,13 +280,18 @@ proc renderVideoWithPipe(scene: Scene) =
 
   ffmpegProcess.inputStream().flush()
   ffmpegProcess.close()
-  doAssert ffmpegProcess.waitForExit() == 0
+
+  let code = ffmpegProcess.waitForExit()
+  if code != 0:
+    error &"FFmpeg could not close gracefully. Exited with code '{code}'"
+
 
 
 proc renderImpl*(userScene: Scene) =
   var
     scene = userScene
     createVideo = false
+    createGif = false
 
   for kind, key, value in getOpt():
     case kind
@@ -285,6 +306,11 @@ proc renderImpl*(userScene: Scene) =
         break
       of "v", "video", "render":
         createVideo = true
+        createGif = false
+        scene.debug = false
+      of "gif":
+        createVideo = false
+        createGif = true
         scene.debug = false
       of "s", "size":
         scene.width = value.parseInt()
@@ -320,6 +346,10 @@ proc renderImpl*(userScene: Scene) =
         echo "    Opens a window with the scene rendered in realtime."
         echo "  -v, --video, --render"
         echo "    Enables video rendering mode. Will output video to renders/final.mp4"
+        echo "  --gif"
+        echo "    WARNING: Huge files. Please use with --size:400 or, preferrably, manually convert"
+        echo "             the mp4 from --render to a GIF."
+        echo "    Enables gif rendering mode. Will output gif to renders/gif.mp4"
         echo "  --fullhd, --1080p"
         echo "    Enables video rendering mode with 1080p settings"
         echo "  --2k, --1440p"
@@ -342,8 +372,8 @@ proc renderImpl*(userScene: Scene) =
 
   scene.setupRendering(not createVideo)
 
-  if createVideo:
-    scene.renderVideoWithPipe()
+  if createVideo or createGif:
+    scene.renderWithPipe(createGif)
   else:
     scene.runLiveRenderingLoop()
 
