@@ -22,7 +22,13 @@ I have a series of animations made using nanim posted to my [Instagram Page](htt
 I also post art to my [OpenSea Page](https://opensea.io/accounts/ErikWDev) where they can be bought as NFT:s.
 
 ### Installation
-Currently, do `git clone git@github.com:EriKWDev/nanim.git --depth=1`, `cd nanim` and finally `nimble install`. Once installed, you can add the optional dependency ffmpeg. For debian/ubuntu that would be `sudo apt install ffmpeg`. This allows you to render your animations to videos using `--render`. Run one of the examples using `nim c -r examples/example_001.nim`!
+### From directory
+Simply do `nimble install nanim`
+
+### From Source
+do `git clone git@github.com:EriKWDev/nanim.git --depth=1`, `cd nanim` and finally `nimble install`. Once installed, you can add the optional dependency ffmpeg. For debian/ubuntu that would be `sudo apt install ffmpeg`. This allows you to render your animations to videos using `--render`.
+
+Run one of the examples using `nim c -r examples/example_001.nim --size:700 --debug:false`!
 
 ### Usage
 Create a normal nim program where you create a Nanim Scene. This scene will carry the state of all animations and entities. This is what the bare minimum looks like:
@@ -126,7 +132,13 @@ Options:
   -r, --run
     Opens a window with the scene rendered in realtime.
   -v, --video, --render
-    Enables video rendering mode. Will output video to renders/final.mp4
+    Enables video rendering mode. Will output video to renders/<name>.mp4
+  --gif
+    WARNING: Huge files. Please use with --size:400 or, preferably, manually convert
+             the mp4 from --render to a GIF.
+    Enables gif rendering mode. Will output gif to renders/<name>.gif
+  --snap, --screenshot, --image, --picture, --png
+    Will create a PNG screenshot of the Scene. Will output to renders/<name>.png
   --fullhd, --1080p
     Enables video rendering mode with 1080p settings
   --2k, --1440p
@@ -137,10 +149,13 @@ Options:
     Sets width to WIDTH
   -h:HEIGHT, --height:HEIGHT
     Sets height to HEIGHT
-  --debug
+  -s:SIZE, --size:SIZE
+    Sets both width andd height to SIZE
+  --debug:true|false
     Enables debug mode which will visualize the scene's tracks.
     Default behaviour is to show the visualization in live mode
     but not in render mode.
+
 ```
 
 Remember that the rendering to video requires [FFMpeg](https://www.ffmpeg.org/) to be installed and available in your `PATH`.

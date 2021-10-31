@@ -412,7 +412,7 @@ proc renderImpl*(userScene: Scene) =
         echo "  -v, --video, --render"
         echo "    Enables video rendering mode. Will output video to renders/<name>.mp4"
         echo "  --gif"
-        echo "    WARNING: Huge files. Please use with --size:400 or, preferrably, manually convert"
+        echo "    WARNING: Huge files. Please use with --size:400 or, preferably, manually convert"
         echo "             the mp4 from --render to a GIF."
         echo "    Enables gif rendering mode. Will output gif to renders/<name>.gif"
         echo "  --snap, --screenshot, --image, --picture, --png"
