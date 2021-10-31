@@ -11,6 +11,7 @@ import
   strutils,
   strformat,
   tables,
+  stb_image/write as stbiw,
   nanim/core,
   nanim/logging,
   nanim/animation
@@ -175,6 +176,64 @@ proc runLiveRenderingLoop(scene: Scene) =
 
   scene.window.destroyWindow()
 
+## Thanks to https://github.com/define-private-public/random-art-Nim/blob/30607d4a912b662be7a3ac1ef8e341e0a5295226/opengl_helpers.nim#L100
+proc offset(some: pointer; b: int): pointer {.inline.} =
+  result = cast[pointer](cast[int](some) + b)
+
+
+proc renderScreenshot(scene: Scene) =
+  var
+    width: cint
+    height: cint
+
+  scene.window.getWindowSize(width.addr, height.addr)
+
+  let
+    rgbaSize = sizeof(cint)
+    bufferSize: int = width * height * rgbaSize
+
+    rendersFolderPath = os.joinPath(os.getAppDir(), "renders")
+    filePath = joinPath(rendersFolderPath, "final_" & $times.now().getClockStr().replace(":", "_"))
+
+  createDir(rendersFolderPath)
+  var data = alloc(bufferSize)
+
+
+  # TODO: Fix to truly initiate all entities. Should go away when a 'Scene.goToTime(t: float)'
+  # proc is implemented in the future.
+
+  scene.beginFrame()
+  scene.tick(0.1)
+  scene.endFrame()
+
+  scene.beginFrame()
+  scene.tick(-0.1)
+  scene.endFrame()
+
+  glPixelStorei(GL_PACK_ALIGNMENT, 1)
+  glReadBuffer(GL_BACK)
+  glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data)
+
+  swapBuffers(scene.window)
+
+  var pixels = newSeq[uint8](bufferSize)
+
+  # Need to flip the pixels along the horizontal...
+  for y in 0..<height:
+    let
+      lineSize = width * rgbaSize
+      yDest = y * lineSize
+      ySrc = bufferSize - yDest - lineSize
+    copyMem(pixels[yDest].unsafeAddr, data.offset(ySrc), lineSize)
+
+  dealloc(data)
+
+  stbiw.writePNG(&"{filePath}.png", width, height, stbiw.RGBA, pixels)
+
+  scene.done = true
+  scene.window.setWindowShouldClose(1)
+  pollEvents()
+
 
 proc renderWithPipe(scene: Scene, createGif = false) =
   var
@@ -292,6 +351,7 @@ proc renderImpl*(userScene: Scene) =
     scene = userScene
     createVideo = false
     createGif = false
+    createScreenshot = false
 
   for kind, key, value in getOpt():
     case kind
@@ -336,6 +396,11 @@ proc renderImpl*(userScene: Scene) =
         scene.height = 2160
       of "debug":
         scene.debug = value.parseBool()
+      of "snap", "screenshot", "image", "picture", "png":
+        createScreenshot = true
+        createVideo = false
+        createGif = false
+        scene.debug = false
       else:
         echo "Nanim (c) Copyright 2021 Erik Wilhem Gren"
         echo ""
@@ -345,11 +410,13 @@ proc renderImpl*(userScene: Scene) =
         echo "  -r, --run"
         echo "    Opens a window with the scene rendered in realtime."
         echo "  -v, --video, --render"
-        echo "    Enables video rendering mode. Will output video to renders/final.mp4"
+        echo "    Enables video rendering mode. Will output video to renders/<name>.mp4"
         echo "  --gif"
         echo "    WARNING: Huge files. Please use with --size:400 or, preferrably, manually convert"
         echo "             the mp4 from --render to a GIF."
-        echo "    Enables gif rendering mode. Will output gif to renders/gif.mp4"
+        echo "    Enables gif rendering mode. Will output gif to renders/<name>.gif"
+        echo "  --snap, --screenshot, --image, --picture, --png"
+        echo "    Will create a PNG screenshot of the Scene. Will output to renders/<name>.png"
         echo "  --fullhd, --1080p"
         echo "    Enables video rendering mode with 1080p settings"
         echo "  --2k, --1440p"
@@ -372,10 +439,13 @@ proc renderImpl*(userScene: Scene) =
 
   scene.setupRendering(not createVideo)
 
-  if createVideo or createGif:
-    scene.renderWithPipe(createGif)
+  if createScreenshot:
+    scene.renderScreenshot()
   else:
-    scene.runLiveRenderingLoop()
+    if createVideo or createGif:
+      scene.renderWithPipe(createGif)
+    else:
+      scene.runLiveRenderingLoop()
 
   nvgDeleteContext(scene.context)
   terminate()
