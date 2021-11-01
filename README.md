@@ -134,8 +134,8 @@ Options:
   -v, --video, --render
     Enables video rendering mode. Will output video to renders/<name>.mp4
   --gif
-    WARNING: Huge files. Please use with --size:400 or, preferably, manually convert
-             the mp4 from --render to a GIF.
+    WARNING: Huge files. Please use with --size:400 --fps:15 or, preferably,
+             manually convert the mp4 from --render to a GIF.
     Enables gif rendering mode. Will output gif to renders/<name>.gif
   --snap, --screenshot, --image, --picture, --png
     Will create a PNG screenshot of the Scene. Will output to renders/<name>.png
@@ -159,13 +159,11 @@ Options:
   -s:SIZE, --size:SIZE
     Sets both width andd height to SIZE
   --fps:FPS, --rate:FPS
-    Sets the desired framerate to FPS. Something like --render --fps:15 is very
-    useful for a quick test render
+    Sets the desired framerate to FPS
   --debug:true|false
     Enables debug mode which will visualize the scene's tracks.
     Default behaviour is to show the visualization in live mode
     but not in render mode.
-
 ```
 
 Remember that the rendering to video requires [FFMpeg](https://www.ffmpeg.org/) to be installed and available in your `PATH`.

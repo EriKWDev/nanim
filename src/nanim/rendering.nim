@@ -275,6 +275,13 @@ proc renderWithPipe(scene: Scene, createGif = false) =
 
   if createGif:
     warn "Currently, the built in GIF-generation is very primitive. It is recommended to instead use --render and manually convert the render to GIF for better results."
+
+    if scene.goalFps > 20.0:
+      warn "You are rendering a GIF at a high framerate. Consider using --fps:15"
+
+    if scene.width > 1000 or scene.height > 1000:
+      warn "You are rendering a GIF at a larger than optimal size. Consider shrinking it down with --width:W, --height:H or --size:S"
+
     ffmpegOptions = @[
       "-y",
       "-f", "rawvideo",
@@ -439,8 +446,8 @@ proc renderImpl*(userScene: Scene) =
         echo "  -v, --video, --render"
         echo "    Enables video rendering mode. Will output video to renders/<name>.mp4"
         echo "  --gif"
-        echo "    WARNING: Huge files. Please use with --size:400 or, preferably, manually convert"
-        echo "             the mp4 from --render to a GIF."
+        echo "    WARNING: Huge files. Please use with --size:400 --fps:15 or, preferably,"
+        echo "             manually convert the mp4 from --render to a GIF."
         echo "    Enables gif rendering mode. Will output gif to renders/<name>.gif"
         echo "  --snap, --screenshot, --image, --picture, --png"
         echo "    Will create a PNG screenshot of the Scene. Will output to renders/<name>.png"
