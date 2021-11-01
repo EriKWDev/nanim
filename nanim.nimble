@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.3.1"
+version       = "0.3.2"
 author        = "EriKWDev"
 description   = "Nanim is an easy-to-use framework to create smooth GPU-accelerated animations and export them to videos."
 license       = "MIT"

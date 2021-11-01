@@ -2,13 +2,14 @@
 import
   nanovg,
   nanim/core,
-  nanim/animation
+  nanim/animation,
+  nanim/logging
 
 
 type
   Text* = ref object of Entity
     message*: string
-    font*: string
+    font*: cstring
     fontSize*: float
     horizontalAlignment*: HorizontalAlign
     verticalAlignment*: VerticalAlign
@@ -42,6 +43,10 @@ proc newText*(message: string = "",
               font: string = "montserrat",
               horizontalAlignment: HorizontalAlign = haCenter,
               verticalAlignment: VerticalAlign = vaBaseline): Text =
+  when not defined(release):
+    if numberOfFontsLoaded <= 0:
+      warn "Using a TextBox without having any fonts in the fonts directory."
+
   new(result)
   result.init()
   result.message = message
@@ -73,6 +78,10 @@ proc newTextBox*(message: string = "",
 
 
 method draw*(textBox: TextBox, scene: Scene) =
+  when not defined(release):
+    if numberOfFontsLoaded <= 0:
+      warn "Using a TextBox without having any fonts in the fonts directory."
+
   let context = scene.context
   context.textAlign(textBox.horizontalAlignment, textBox.verticalAlignment)
   context.fontSize(textBox.fontSize * 10)

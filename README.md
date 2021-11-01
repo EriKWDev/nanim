@@ -66,6 +66,8 @@ proc testScene(): Scene =
   colors.del(0)
   scene.setBackgroundColor(bg)
 
+  # We can have text too! You have to put your TTF-fonts in a 'fonts' directory
+  # next to the binary. 'Montserrat-Thin.ttf' will be known as 'montserrat-thin'
   var
     text = newText("Hello, World!", font="montserrat-thin")
     rect = newSquare()
@@ -129,8 +131,6 @@ The scenes can then be run by simply compiling the file like so: `nim c -r <file
 Here are all the options (keep in mind that it is the last option(s) supplied that takes priority over others):
 ```
 Options:
-  -r, --run
-    Opens a window with the scene rendered in realtime.
   -v, --video, --render
     Enables video rendering mode. Will output video to renders/<name>.mp4
   --gif
@@ -140,17 +140,27 @@ Options:
   --snap, --screenshot, --image, --picture, --png
     Will create a PNG screenshot of the Scene. Will output to renders/<name>.png
   --fullhd, --1080p
-    Enables video rendering mode with 1080p settings
+    width 1920, height 1080 (16:9)
   --2k, --1440p
-    Enables video rendering mode with 1440p settings
+    width 2880, height 2560 (18:9)
   --4k, --2160p
-    Enables video rendering mode with 2160p settings
+    width 3840, height 2160 (18:9)
+  --shorts
+    width 1440, height 2560 (9:16)
+  --square
+    width 1000, height 1000 (1:1)
+  --ratio:W:H
+    Sets the ratio between width and height. Example: --ratio:16:9 --width:1920
+    will set width to 1920 and height to 1080
   -w:WIDTH, --width:WIDTH
     Sets width to WIDTH
   -h:HEIGHT, --height:HEIGHT
     Sets height to HEIGHT
   -s:SIZE, --size:SIZE
     Sets both width andd height to SIZE
+  --fps:FPS, --rate:FPS
+    Sets the desired framerate to FPS. Something like --render --fps:15 is very
+    useful for a quick test render
   --debug:true|false
     Enables debug mode which will visualize the scene's tracks.
     Default behaviour is to show the visualization in live mode

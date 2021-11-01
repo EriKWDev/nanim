@@ -125,7 +125,8 @@ proc setupRendering(userScene: Scene, resizable: bool = true) =
   scene.window.makeContextCurrent()
 
   # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-  loadExtensions()
+  when not defined(emscripten):
+    loadExtensions()
 
   nvgInit(getProcAddress)
   scene.context = createNVGContext()
@@ -136,6 +137,19 @@ proc setupRendering(userScene: Scene, resizable: bool = true) =
 
 
 var cursorPositionCallback: proc(window: Window, x, y: cdouble) {.closure.}
+
+proc liveLoop(scene: Scene) =
+  scene.beginFrame()
+  scene.update()
+  scene.endFrame()
+
+  swapBuffers(scene.window)
+  pollEvents()
+
+when defined(emscripten):
+  proc emscripten_set_main_loop(f: proc() {.cdecl.}, a: cint, b: bool) {.importc.}
+
+  var sceneCaller: proc() {.closure.}
 
 proc runLiveRenderingLoop(scene: Scene) =
   # TODO: Make scene.update loop be on a separate thread. That would allow rendering even while user is dragging/resizing window...
@@ -166,13 +180,18 @@ proc runLiveRenderingLoop(scene: Scene) =
   # Compensate for the time it took to get here
   scene.time = scene.time - getCurrentRealTime()
 
-  while scene.window.windowShouldClose() == 0:
-    scene.beginFrame()
-    scene.update()
-    scene.endFrame()
+  when not defined(emscripten):
+    while scene.window.windowShouldClose() == 0:
+      scene.liveLoop()
+  else:
+    sceneCaller =
+      proc() {.closure.} =
+        scene.liveLoop()
 
-    swapBuffers(scene.window)
-    pollEvents()
+    proc mainLoop() {.cdecl.} =
+      sceneCaller()
+
+    emscripten_set_main_loop(mainLoop, 0, true)
 
   scene.window.destroyWindow()
 
@@ -245,8 +264,7 @@ proc renderWithPipe(scene: Scene, createGif = false) =
   let
     rgbaSize = sizeof(cint)
     bufferSize: int = width * height * rgbaSize
-    goalFps = 60
-    goalDeltaTime = 1000.0/goalFps.float
+    goalDeltaTime = 1000.0/scene.goalFPS
 
     rendersFolderPath = os.joinPath(os.getAppDir(), "renders")
     filePath = joinPath(rendersFolderPath, "final_" & $times.now().getClockStr().replace(":", "_"))
@@ -262,7 +280,7 @@ proc renderWithPipe(scene: Scene, createGif = false) =
       "-f", "rawvideo",
       "-pix_fmt", "rgba",
       "-s", $width & "x" & $height,
-      "-r", $goalFps,
+      "-r", $scene.goalFps,
       "-i", "-", # * Set input to pipe
       "-vf", "vflip",  # * Flips the image vertically since glReadPixels gives flipped image
       "-an",  # * Don't expect audio
@@ -280,7 +298,7 @@ proc renderWithPipe(scene: Scene, createGif = false) =
       "-f", "rawvideo",
       "-pix_fmt", "rgba",
       "-s", $width & "x" & $height,
-      "-r", $goalFps,
+      "-r", $scene.goalFps,
       "-i", "-", # * Set input to pipe
       "-vf", "vflip", # * Flips the image vertically since glReadPixels gives flipped image
       "-an",  # * Don't expect audio
@@ -352,6 +370,10 @@ proc renderImpl*(userScene: Scene) =
     createVideo = false
     createGif = false
     createScreenshot = false
+    ratioVertical = 1.0
+    ratioHorizontal = 1.0
+    width = -1
+    height = -1
 
   for kind, key, value in getOpt():
     case kind
@@ -363,7 +385,7 @@ proc renderImpl*(userScene: Scene) =
       of "r", "run":
         createVideo = false
         scene.debug = true
-        break
+        warn "Deprecated option '-r/--run'. This is default behaviour, no need to specify."
       of "v", "video", "render":
         createVideo = true
         createGif = false
@@ -373,27 +395,34 @@ proc renderImpl*(userScene: Scene) =
         createGif = true
         scene.debug = false
       of "s", "size":
-        scene.width = value.parseInt()
-        scene.height = value.parseInt()
+        width = value.parseInt()
+        height = value.parseInt()
       of "w", "width":
-        scene.width = value.parseInt()
+        width = value.parseInt()
       of "h", "height":
-        scene.height = value.parseInt()
+        height = value.parseInt()
+      of "ratio":
+        let ratios = value.split(":")
+        if len(ratios) == 2:
+          ratioHorizontal = ratios[0].parseFloat()
+          ratioVertical = ratios[1].parseFloat()
+      of "square":
+        width = 1000
+        height = 1000
       of "1080p", "fullhd":
-        createVideo = true
-        scene.debug = false
-        scene.width = 1920
-        scene.height = 1080
+        width = 1920
+        height = 1080
       of "1440p", "2k":
-        createVideo = true
-        scene.debug = false
-        scene.width = 2880
-        scene.height = 1440
+        width = 2880
+        height = 1440
+      of "fps", "rate":
+        scene.goalFPS = value.parseFloat()
+      of "shorts":
+        width = 1440
+        height = 2560
       of "2560p", "4k":
-        createVideo = true
-        scene.debug = false
-        scene.width = 3840
-        scene.height = 2160
+        width = 3840
+        height = 2160
       of "debug":
         scene.debug = value.parseBool()
       of "snap", "screenshot", "image", "picture", "png":
@@ -407,8 +436,6 @@ proc renderImpl*(userScene: Scene) =
         echo "  <filename_containing_scene> [options]"
         echo ""
         echo "Options:"
-        echo "  -r, --run"
-        echo "    Opens a window with the scene rendered in realtime."
         echo "  -v, --video, --render"
         echo "    Enables video rendering mode. Will output video to renders/<name>.mp4"
         echo "  --gif"
@@ -418,17 +445,26 @@ proc renderImpl*(userScene: Scene) =
         echo "  --snap, --screenshot, --image, --picture, --png"
         echo "    Will create a PNG screenshot of the Scene. Will output to renders/<name>.png"
         echo "  --fullhd, --1080p"
-        echo "    Enables video rendering mode with 1080p settings"
+        echo "    width 1920, height 1080 (16:9)"
         echo "  --2k, --1440p"
-        echo "    Enables video rendering mode with 1440p settings"
+        echo "    width 2880, height 2560 (18:9)"
         echo "  --4k, --2160p"
-        echo "    Enables video rendering mode with 2160p settings"
+        echo "    width 3840, height 2160 (18:9)"
+        echo "  --shorts"
+        echo "    width 1440, height 2560 (9:16)"
+        echo "  --square"
+        echo "    width 1000, height 1000 (1:1)"
+        echo "  --ratio:W:H"
+        echo "    Sets the ratio between width and height. Example: --ratio:16:9 --width:1920"
+        echo "    will set width to 1920 and height to 1080"
         echo "  -w:WIDTH, --width:WIDTH"
         echo "    Sets width to WIDTH"
         echo "  -h:HEIGHT, --height:HEIGHT"
         echo "    Sets height to HEIGHT"
         echo "  -s:SIZE, --size:SIZE"
         echo "    Sets both width andd height to SIZE"
+        echo "  --fps:FPS, --rate:FPS"
+        echo "    Sets the desired framerate to FPS"
         echo "  --debug:true|false"
         echo "    Enables debug mode which will visualize the scene's tracks."
         echo "    Default behaviour is to show the visualization in live mode"
@@ -436,6 +472,19 @@ proc renderImpl*(userScene: Scene) =
         return
 
     of cmdEnd: discard
+
+  # TODO: Refactor? I was tired when I did this, but it works.
+  if width > 0 or height > 0:
+    if width >= height:
+      let ratio = ratioVertical/ratioHorizontal
+      scene.width = width
+      scene.height = int(width.float * ratio)
+    else:
+      let ratio = ratioHorizontal/ratioVertical
+      scene.width = int(height.float * ratio)
+      scene.height = height
+
+  info &"Width: {scene.width}, Height: {scene.height} (ratio: {scene.width.float/scene.height.float:.2f}:1.00), FPS: {scene.goalFPS}"
 
   scene.setupRendering(not createVideo)
 

@@ -2,6 +2,7 @@
 import
   glm,
   hashes,
+  strformat,
   staticglfw,
   tables,
   nanovg,
@@ -77,6 +78,7 @@ type
     restartTime*: float
     lastTickTime*: float
     deltaTime*: float
+    goalFPS*: float
 
     frameBufferWidth*: int32
     frameBufferHeight*: int32
@@ -705,7 +707,7 @@ proc apply*(base: Style, style: Style) =
 
 
 let
-  defaultPaint*: Style = newStyle().copyWith(fillMode=smSolidColor, strokeMode=smSolidColor, strokeWidth=0.0)
+  defaultPaint*: Style = newStyle().copyWith(fillMode=smSolidColor, strokeMode=smNone, strokeWidth=0.0)
   bluePaint*: Style = defaultPaint.copyWith(fillColor=rgb(55, 100, 220), strokeColor=rgb(75, 80, 223), strokeWidth=30.0)
   noisePaint*: Style = defaultPaint.copyWith(fillPattern=noisePattern, fillMode=smPaintPattern)
   gradientPaint*: Style = noisePaint.copyWith(fillPattern = proc(scene: Scene): Paint = gradient(scene))
@@ -1091,10 +1093,12 @@ proc setBackgroundColor*(scene: Scene, color: Color = rgb(255, 255, 255)) =
   scene.background = proc(scene: Scene) = scene.fill(color)
 
 
+var numberOfFontsLoaded* = 0
 proc loadFont*(context: NVGContext, name: string, path: string) =
   info "Loading font '", path, "' (" & name & ")"
   let font = context.createFont(name, path)
   doAssert not (font == NoFont)
+  inc numberOfFontsLoaded
 
 proc loadFont*(scene: Scene, name: string, path: string) {.inline.} =
   scene.fontsToLoad.add((name, path))
@@ -1130,6 +1134,7 @@ proc init(scene: Scene) =
   scene.currentTweenTrackId = defaultTrackId
   scene.width = 1200
   scene.height = 900
+  scene.goalFPS = 60.0
 
   scene.tweenTracks[scene.currentTweenTrackId] = newTweenTrack()
   scene.projectionMatrix = mat4x4[float](vec4[float](1,0,0,0),
@@ -1326,6 +1331,10 @@ proc visualizeTracks(scene: Scene) =
 
   let unit = 1000.0
 
+  scene.context.fillColor(vizBlue)
+  scene.context.textAlign(haLeft, vaMiddle)
+  discard scene.context.text(-160.0, 10.0, &"FPS: {1000.0/scene.deltaTime:0f}")
+
   var i = 0
   for id, track in scene.tweenTracks.pairs:
     scene.context.fillColor(vizBlue)
@@ -1431,7 +1440,7 @@ proc tick*(scene: Scene, deltaTime: float = 1000.0/120.0) =
 proc update*(scene: Scene) =
   let
     time = getCurrentRealTime()
-    goalDelta = 1000.0/120.0
+    goalDelta = 1000.0/scene.goalFPS
     delta = time - scene.lastTickTime
 
   if delta >= goalDelta:
