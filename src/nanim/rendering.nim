@@ -200,7 +200,7 @@ proc offset(some: pointer; b: int): pointer {.inline.} =
   result = cast[pointer](cast[int](some) + b)
 
 
-proc renderScreenshot(scene: Scene) =
+proc renderScreenshot(scene: Scene, filePath: string) =
   var
     width: cint
     height: cint
@@ -211,10 +211,6 @@ proc renderScreenshot(scene: Scene) =
     rgbaSize = sizeof(cint)
     bufferSize: int = width * height * rgbaSize
 
-    rendersFolderPath = os.joinPath(os.getAppDir(), "renders")
-    filePath = joinPath(rendersFolderPath, "final_" & $times.now().getClockStr().replace(":", "_"))
-
-  createDir(rendersFolderPath)
   var data = alloc(bufferSize)
 
 
@@ -254,7 +250,7 @@ proc renderScreenshot(scene: Scene) =
   pollEvents()
 
 
-proc renderWithPipe(scene: Scene, createGif = false) =
+proc renderWithPipe(scene: Scene, filePath: string, createGif = false) =
   var
     width: cint
     height: cint
@@ -265,11 +261,6 @@ proc renderWithPipe(scene: Scene, createGif = false) =
     rgbaSize = sizeof(cint)
     bufferSize: int = width * height * rgbaSize
     goalDeltaTime = 1000.0/scene.goalFPS
-
-    rendersFolderPath = os.joinPath(os.getAppDir(), "renders")
-    filePath = joinPath(rendersFolderPath, "final_" & $times.now().getClockStr().replace(":", "_"))
-
-  createDir(rendersFolderPath)
 
   var ffmpegOptions: seq[string]
 
@@ -370,73 +361,81 @@ proc renderWithPipe(scene: Scene, createGif = false) =
     error &"FFmpeg could not close gracefully. Exited with code '{code}'"
 
 
+func defaultOptions: RenderOptions =
+    result.debug = true
+    result.createVideo = false
+    result.createGif = false
+    result.createScreenshot = false
 
-proc renderImpl*(userScene: Scene) =
-  var
-    scene = userScene
-    createVideo = false
-    createGif = false
-    createScreenshot = false
-    ratioVertical = 1.0
-    ratioHorizontal = 1.0
-    width = -1
-    height = -1
+    result.width = -1
+    result.height = -1
 
+    result.ratioVertical = 1.0
+    result.ratioHorizontal = 1.0
+
+    result.goalFps = -1
+
+const allowedExtensions = [".mp4", ".gif", ".png"]
+
+proc update*(options: var RenderOptions) =
   for kind, key, value in getOpt():
     case kind
     of cmdArgument:
       discard
-
     of cmdLongOption, cmdShortOption:
       case key
       of "r", "run":
-        createVideo = false
-        scene.debug = true
+        options.createVideo = false
+        options.debug = true
         warn "Deprecated option '-r/--run'. This is default behaviour, no need to specify."
       of "v", "video", "render":
-        createVideo = true
-        createGif = false
-        scene.debug = false
+        options.createVideo = true
+        options.createGif = false
+        options.debug = false
       of "gif":
-        createVideo = false
-        createGif = true
-        scene.debug = false
+        options.createVideo = false
+        options.createGif = true
+        options.debug = false
       of "s", "size":
-        width = value.parseInt()
-        height = value.parseInt()
+        options.width = value.parseInt()
+        options.height = value.parseInt()
       of "w", "width":
-        width = value.parseInt()
+        options.width = value.parseInt()
       of "h", "height":
-        height = value.parseInt()
+        options.height = value.parseInt()
       of "ratio":
         let ratios = value.split(":")
         if len(ratios) == 2:
-          ratioHorizontal = ratios[0].parseFloat()
-          ratioVertical = ratios[1].parseFloat()
+          options.ratioHorizontal = ratios[0].parseFloat()
+          options.ratioVertical = ratios[1].parseFloat()
       of "square":
-        width = 1000
-        height = 1000
+        options.width = 1000
+        options.height = 1000
       of "1080p", "fullhd":
-        width = 1920
-        height = 1080
+        options.width = 1920
+        options.height = 1080
       of "1440p", "2k":
-        width = 2880
-        height = 1440
+        options.width = 2880
+        options.height = 1440
       of "fps", "rate":
-        scene.goalFPS = value.parseFloat()
+        options.goalFPS = value.parseFloat()
       of "shorts":
-        width = 1440
-        height = 2560
+        options.width = 1440
+        options.height = 2560
       of "2560p", "4k":
-        width = 3840
-        height = 2160
+        options.width = 3840
+        options.height = 2160
       of "debug":
-        scene.debug = value.parseBool()
+        options.debug = value.parseBool()
       of "snap", "screenshot", "image", "picture", "png":
-        createScreenshot = true
-        createVideo = false
-        createGif = false
-        scene.debug = false
+        options.createScreenshot = true
+        options.createVideo = false
+        options.createGif = false
+        options.debug = false
+      of "folder", "folderPath":
+        options.folderPath = value
+      of "file", "fileName":
+        options.fileName = value
       else:
         echo "Nanim (c) Copyright 2021 Erik Wilhem Gren"
         echo ""
@@ -469,46 +468,99 @@ proc renderImpl*(userScene: Scene) =
         echo "  -h:HEIGHT, --height:HEIGHT"
         echo "    Sets height to HEIGHT"
         echo "  -s:SIZE, --size:SIZE"
-        echo "    Sets both width andd height to SIZE"
+        echo "    Sets both width and height to SIZE"
         echo "  --fps:FPS, --rate:FPS"
         echo "    Sets the desired framerate to FPS"
         echo "  --debug:true|false"
         echo "    Enables debug mode which will visualize the scene's tracks."
         echo "    Default behaviour is to show the visualization in live mode"
         echo "    but not in render mode."
+        echo "  --folder:PATH, --folderPath:PATH"
+        echo "    Sets folder path to PATH"
+        echo "    Default is 'renders'"
+        echo "  --file:NAME.EXT, --fileName:NAME.EXT"
+        echo "    Sets file name to NAME.EXT"
+        echo "    EXT must be one of " & allowedExtensions.join(", ")
+        echo "    Default is 'final_HH_MM_SS'"
         return
 
     of cmdEnd: discard
 
   # TODO: Refactor? I was tired when I did this, but it works.
-  if width > 0 or height > 0:
-    if width >= height:
-      let ratio = ratioVertical/ratioHorizontal
-      scene.width = width
-      scene.height = int(width.float * ratio)
+  if options.width > 0 or options.height > 0:
+    let ratio = options.ratioVertical / options.ratioHorizontal
+    if options.width >= options.height:
+      options.width = options.width
+      options.height = int(options.width.float * ratio)
     else:
-      let ratio = ratioHorizontal/ratioVertical
-      scene.width = int(height.float * ratio)
-      scene.height = height
+      options.width = int(options.height.float * ratio)
+      options.height = options.height
+
+
+proc setFilePath(folderPath, fileName: string): string =
+  var
+    folderPath = folderPath
+    fileName = fileName
+  if folderPath == "":
+    folderPath = os.joinPath(getCurrentDir(), "renders")
+  createDir(folderPath)
+
+  if fileName == "":
+    fileName = "final_" & $times.now().getClockStr().replace(":", "_")
+  result = joinPath(folderPath, fileName)
+
+
+proc renderImpl*(userScene: Scene, options: RenderOptions = defaultOptions(), updateOptions: bool = true) =
+  var
+    scene = userScene
+    options = options
+
+  if updateOptions:
+    update options
+
+  scene.debug = options.debug
+  if options.goalFPS > 0:
+    scene.goalFPS = options.goalFPS
+  if options.height > 0:
+    scene.height = options.height
+  if options.width > 0:
+    scene.width = options.width
 
   info &"Width: {scene.width}, Height: {scene.height} (ratio: {scene.width.float/scene.height.float:.2f}:1.00), FPS: {scene.goalFPS}"
 
-  scene.setupRendering(not createVideo)
+  scene.setupRendering(not options.createVideo)
 
-  if createScreenshot:
-    scene.renderScreenshot()
-  else:
-    if createVideo or createGif:
-      scene.renderWithPipe(createGif)
+  if options.createScreenshot or options.createVideo or options.createGif:
+    let filePath = setFilePath(options.folderPath, options.fileName)
+    if options.createScreenshot:
+      scene.renderScreenshot(filePath)
     else:
-      scene.runLiveRenderingLoop()
+      scene.renderWithPipe(filePath, options.createGif)
+  else:
+    scene.runLiveRenderingLoop()
 
   nvgDeleteContext(scene.context)
   terminate()
 
+proc render*(userScene: Scene, options: RenderOptions = defaultOptions(), updateOptions: bool = true) =
+  renderImpl(userScene, options, updateOptions)
 
-proc render*(userScene: Scene) =
-  renderImpl(userScene)
+proc render*(userSceneCreator: proc(): Scene, options: RenderOptions = defaultOptions(), updateOptions: bool = true) =
+  renderImpl(userSceneCreator(), options, updateOptions)
 
-proc render*(userSceneCreator: proc(): Scene) =
-  renderImpl(userSceneCreator())
+proc render*(userScene: Scene | proc(): Scene, url: string; debug = false, width, height = -1; ratioHorizontal, ratioVertical = 1.0) =
+  let (dir, name, ext) = splitFile(url)
+  doAssert ext in allowedExtensions, ext & " is not a valid extension, must be one of " & allowedExtensions.join(", ")
+  let options = RenderOptions(
+    debug: debug,
+    createVideo: if ext == ".mp4": true else: false,
+    createGif: if ext == ".gif": true else: false,
+    createScreenshot: if ext == ".png": true else: false,
+    width: width,
+    height: height,
+    ratioHorizontal: ratioHorizontal,
+    ratioVertical: ratioVertical,
+    folderPath: dir,
+    fileName: name,
+  )
+  render(userScene, options, updateOptions=false)

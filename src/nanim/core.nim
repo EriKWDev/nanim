@@ -94,6 +94,22 @@ type
     done*: bool
     debug*: bool
 
+  RenderOptions* = object
+    debug*: bool
+    createVideo*: bool
+    createGif*: bool
+    createScreenshot*: bool
+
+    width*: int
+    height*: int
+
+    ratioHorizontal*: float
+    ratioVertical*: float
+
+    goalFPS*: float
+
+    folderPath*: string
+    fileName*: string
 
 const
   pointsPerCurve* = 3
