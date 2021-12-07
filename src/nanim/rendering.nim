@@ -255,7 +255,7 @@ proc renderWithPipe(scene: Scene, filePath: string, createGif = false) =
     width: cint
     height: cint
 
-  scene.window.getWindowSize(width.addr, height.addr)
+  scene.window.getFramebufferSize(width.addr, height.addr)
 
   let
     rgbaSize = sizeof(cint)
