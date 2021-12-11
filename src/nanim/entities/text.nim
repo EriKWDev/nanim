@@ -4,6 +4,7 @@ import
   nanim/core,
   nanim/animation,
   nanim/logging
+from strutils import toLowerAscii
 
 
 type
@@ -51,7 +52,7 @@ proc newText*(message: string = "",
   result.init()
   result.message = message
   result.fontSize = fontSize
-  result.font = font
+  result.font = font.toLowerAscii
   result.horizontalAlignment = horizontalAlignment
   result.verticalAlignment = verticalAlignment
 
@@ -72,7 +73,7 @@ proc newTextBox*(message: string = "",
   result.width = width
   result.message = message
   result.fontSize = fontSize
-  result.font = font
+  result.font = font.toLowerAscii
   result.horizontalAlignment = horizontalAlignment
   result.verticalAlignment = verticalAlignment
 
