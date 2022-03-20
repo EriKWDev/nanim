@@ -24,3 +24,4 @@ proc `~=`*(a: Vec2[float], b: Vec3[float]): bool {.inline.} =
 
 proc `~=`*(a, b: Color): bool {.inline.} =
   result = a.r ~= b.r and a.g ~= b.g and a.b ~= b.b and a.a ~= b.a
+

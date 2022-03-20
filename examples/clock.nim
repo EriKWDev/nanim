@@ -56,3 +56,4 @@ proc scene039(): Scene =
 
 when isMainModule:
   render(scene039)
+

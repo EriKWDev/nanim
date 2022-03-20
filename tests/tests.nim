@@ -165,6 +165,7 @@ suite "Scene & Entity tests":
     scene.loadDefaultFonts()
     check len(scene.fontsToLoad) == oldFontsLen
 
+
 suite "Easings, Tweens and Interpolations":
   test "Easings":
     check linear(0.1) ~= 0.1
@@ -532,6 +533,7 @@ suite "Styles & Colors":
     check interpolate(colorA, colorB, 0.5) ~= colorC
     check interpolate(colorA, colorB, 1.0) ~= colorB
 
+
 suite "SVG, Vector Entities and Vector Utilities":
   test "Point Equality":
     check arePointsConsideredEqual(vec3(0.0, 0.0, 0.0), vec3(0.0, 0.0, 0.0)) == true
@@ -547,6 +549,7 @@ suite "SVG, Vector Entities and Vector Utilities":
     check arePointsConsideredEqual(vec3(0.0, 0.0, 0.0), vec3(0.0, toleranceForPointEquality, toleranceForPointEquality)) == false
     check arePointsConsideredEqual(vec3(0.0, 0.0, 0.0), vec3(toleranceForPointEquality, toleranceForPointEquality, toleranceForPointEquality)) == false
 
+
 suite "Other":
   test "Entity Extents":
     let
@@ -560,3 +563,4 @@ suite "Other":
 
     check entityExtents.height ~= 10
     check entityExtents.width ~= 10
+

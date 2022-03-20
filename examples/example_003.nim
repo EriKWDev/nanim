@@ -25,3 +25,4 @@ proc scene051(): Scene =
 
 when isMainModule:
   render(scene051)
+
